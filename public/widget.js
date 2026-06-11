@@ -4,6 +4,9 @@
   let userResponses = {};
   let quoteResult = null;
   
+  // LICENCE FORCÉE POUR COUVERTURE PARIS PRO
+  const FORCED_LICENSE = 'DMP2024';
+  
   const steps = [
     { id: 'projectType', title: 'Type de projet', type: 'options' },
     { id: 'material', title: 'Matériau', type: 'options' },
@@ -16,7 +19,7 @@
   
   const projectTypes = [
     { value: 'renovation', label: 'Réfection complète', icon: '🏠', description: 'Toiture entière à refaire' },
-    { value: 'repair', label: 'Réparation', icon: '🔧', description: 'Réparation局部e' },
+    { value: 'repair', label: 'Réparation', icon: '🔧', description: 'Réparation localisée' },
     { value: 'cleaning', label: 'Démoussage', icon: '🧹', description: 'Nettoyage et traitement' },
     { value: 'insulation', label: 'Isolation toiture', icon: '🔥', description: 'Isolation thermique' }
   ];
@@ -52,13 +55,16 @@
   
   async function initWidget() {
     try {
+      // Utiliser la licence forcée ou celle de l'URL
       const urlParams = new URLSearchParams(window.location.search);
-      const licenseKey = urlParams.get('license') || getLicenseFromScript();
+      const licenseKey = FORCED_LICENSE || urlParams.get('license') || getLicenseFromScript();
       
       if (!licenseKey) {
         console.error('No license key provided');
         return;
       }
+      
+      console.log('Licence utilisée:', licenseKey);
       
       const domain = window.location.hostname;
       const response = await fetch(`/api/license?license=${licenseKey}&domain=${domain}`);
@@ -332,7 +338,7 @@
   }
   
   async function calculateQuote() {
-    const licenseKey = getLicenseFromScript();
+    const licenseKey = FORCED_LICENSE || getLicenseFromScript();
     
     const projectData = {
       projectType: userResponses.projectType,
@@ -398,7 +404,7 @@
         
         <div class="widget-form-group">
           <label>Email</label>
-          <input type="email" id="lead-email" class="widget-input" placeholder="jean@example.com">
+          <input type="email" id="lead-email" class="widget-input" placeholder="jean@exemple.fr">
         </div>
         
         <div class="widget-actions">
@@ -431,7 +437,7 @@
       return;
     }
     
-    const licenseKey = getLicenseFromScript();
+    const licenseKey = FORCED_LICENSE || getLicenseFromScript();
     
     const leadData = {
       name,
