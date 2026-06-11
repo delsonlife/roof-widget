@@ -1,8 +1,13 @@
 {
   "DMP2024": {
-    "domain": "d-m-nageur1.vercel.app",
-    "domainPattern": "*.vercel.app",
     "active": true,
+    "domain": "d-m-nageur1.vercel.app",
+    "allowedOrigins": [
+      "https://d-m-nageur1.vercel.app",
+      "https://www.d-m-nageur1.vercel.app"
+    ],
+    "secret": "8hG7xK29mP4qR5tY",
+    "emailNotifications": ["client@email.com"],
     "branding": {
       "primaryColor": "#ff6b00",
       "secondaryColor": "#ff8533",
@@ -81,17 +86,6 @@
         "province": 1.0,
         "rural": 0.95
       }
-    },
-    "complexityRules": {
-      "faible": { "min": 0, "max": 1.0 },
-      "moyenne": { "min": 1.0, "max": 1.3 },
-      "elevee": { "min": 1.3, "max": 2.0 }
-    },
-    "daysEstimate": {
-      "faible": { "min": 1, "max": 3 },
-      "moyenne": { "min": 3, "max": 5 },
-      "elevee": { "min": 5, "max": 10 },
-      "tres_elevee": { "min": 10, "max": 15 }
     }
   }
 }
