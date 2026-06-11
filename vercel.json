@@ -1,59 +1,71 @@
 {
-  "version": 2,
-  "public": true,
   "functions": {
     "api/*.js": {
-      "memory": 128,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "memory": 1024
     }
   },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/widget.js",
-      "dest": "/public/widget.js"
-    },
-    {
-      "src": "/widget.css",
-      "dest": "/public/widget.css"
-    },
-    {
-      "src": "/logos/(.*)",
-      "dest": "/public/logos/$1"
-    }
-  ],
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.vercel.app; frame-ancestors 'none';"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(), microphone=(), camera=()"
+        }
       ]
     },
     {
       "source": "/widget.js",
       "headers": [
-        { "key": "Content-Type", "value": "application/javascript" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
         {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; connect-src *; style-src 'self' 'unsafe-inline'; img-src * data:"
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, immutable"
         }
       ]
     },
     {
-      "source": "/widget.css",
+      "source": "/widget.min.js",
       "headers": [
-        { "key": "Content-Type", "value": "text/css" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, immutable"
+        }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/widget.js",
+      "destination": "/public/widget.js"
+    },
+    {
+      "source": "/widget.min.js",
+      "destination": "/public/widget.min.js"
+    },
+    {
+      "source": "/widget.css",
+      "destination": "/public/widget.css"
     }
   ]
 }
