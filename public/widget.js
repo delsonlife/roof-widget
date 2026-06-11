@@ -1,257 +1,466 @@
 (function() {
+  // Configuration
+  const FORCED_LICENSE = 'DMP2024';
   let currentStep = 0;
-  let userResponses = {};
+  let answers = {};
   let quoteResult = null;
   
-  // Configuration
-  const LICENSE_KEY = 'DMP2024';
-  const API_BASE = window.location.origin;
-  
-  const steps = [
-    { id: 'projectType', title: 'Type de projet', type: 'options' },
-    { id: 'material', title: 'Matériau', type: 'options' },
-    { id: 'surface', title: 'Surface du toit', type: 'slider' },
-    { id: 'sides', title: 'Nombre de pans', type: 'options' },
-    { id: 'accessibility', title: 'Accessibilité', type: 'options' },
-    { id: 'options', title: 'Options', type: 'multiselect' },
-    { id: 'postalCode', title: 'Code postal', type: 'input' }
+  // Définition des questions (12 étapes)
+  const questions = [
+    {
+      id: 'projectType',
+      question: 'Quel est votre projet ?',
+      type: 'options',
+      options: [
+        { value: 'refection_complete', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
+        { value: 'reparation', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
+        { value: 'demoussage', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
+        { value: 'isolation', label: 'Isolation de toiture', icon: '🔥', desc: 'Isolation thermique' },
+        { value: 'recherche_fuite', label: 'Recherche de fuite', icon: '💧', desc: 'Détection et réparation' }
+      ]
+    },
+    {
+      id: 'buildingType',
+      question: 'Quel type de bâtiment ?',
+      type: 'options',
+      options: [
+        { value: 'maison', label: 'Maison individuelle', icon: '🏡' },
+        { value: 'garage', label: 'Garage', icon: '🚗' },
+        { value: 'dependance', label: 'Dépendance', icon: '🏚️' },
+        { value: 'immeuble', label: 'Immeuble', icon: '🏢' },
+        { value: 'local_pro', label: 'Local professionnel', icon: '🏭' }
+      ]
+    },
+    {
+      id: 'surface',
+      question: 'Quelle est la surface approximative ?',
+      type: 'slider',
+      min: 20,
+      max: 500,
+      step: 5,
+      unit: 'm²',
+      default: 80
+    },
+    {
+      id: 'material',
+      question: 'Quel est le matériau de couverture ?',
+      type: 'options',
+      options: [
+        { value: 'tuile', label: 'Tuile terre cuite', icon: '🏺', price: '120 €/m²' },
+        { value: 'ardoise', label: 'Ardoise naturelle', icon: '🪨', price: '220 €/m²' },
+        { value: 'zinc', label: 'Zinc', icon: '⚙️', price: '200 €/m²' },
+        { value: 'bac_acier', label: 'Bac acier', icon: '🔩', price: '90 €/m²' }
+      ]
+    },
+    {
+      id: 'age',
+      question: 'Quel âge a votre toiture ?',
+      type: 'options',
+      options: [
+        { value: 'moins_10', label: 'Moins de 10 ans', icon: '🆕' },
+        { value: '10_20', label: '10 à 20 ans', icon: '📅' },
+        { value: '20_30', label: '20 à 30 ans', icon: '📆' },
+        { value: 'plus_30', label: 'Plus de 30 ans', icon: '🏚️' },
+        { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓' }
+      ]
+    },
+    {
+      id: 'state',
+      question: 'Quel est l\'état général de la toiture ?',
+      type: 'options',
+      options: [
+        { value: 'bon', label: 'Bon état', icon: '✅', desc: 'Quelques tuiles à remplacer' },
+        { value: 'moyen', label: 'État moyen', icon: '⚠️', desc: 'Usure visible' },
+        { value: 'degrade', label: 'Dégradée', icon: '🔧', desc: 'Fuite possible' },
+        { value: 'tres_degrade', label: 'Très dégradée', icon: '🚨', desc: 'Urgence' }
+      ]
+    },
+    {
+      id: 'sides',
+      question: 'Combien de pans comporte votre toiture ?',
+      type: 'options',
+      options: [
+        { value: '1', label: '1 pan', icon: '📐' },
+        { value: '2', label: '2 pans', icon: '📏' },
+        { value: '4', label: '4 pans', icon: '🔲' },
+        { value: 'plus', label: 'Plus de 4 pans', icon: '🔳' }
+      ]
+    },
+    {
+      id: 'pente',
+      question: 'Quelle est la pente du toit ?',
+      type: 'options',
+      options: [
+        { value: 'faible', label: 'Faible (moins de 15°)', icon: '📉' },
+        { value: 'moyenne', label: 'Moyenne (15°-30°)', icon: '➡️' },
+        { value: 'forte', label: 'Forte (30°-45°)', icon: '📈' },
+        { value: 'tres_forte', label: 'Très forte (plus de 45°)', icon: '⛰️' }
+      ]
+    },
+    {
+      id: 'accessibility',
+      question: 'Accessibilité du chantier ?',
+      type: 'options',
+      options: [
+        { value: 'plain_pied', label: 'Plain-pied', icon: '🏡', supplement: '0€' },
+        { value: '1_etage', label: '1 étage', icon: '🏢', supplement: '+800€' },
+        { value: '2_etages', label: '2 étages', icon: '🏗️', supplement: '+1800€' },
+        { value: '3_etages_plus', label: '3 étages ou plus', icon: '🏛️', supplement: '+3000€' }
+      ]
+    },
+    {
+      id: 'depose',
+      question: 'Faut-il déposer l\'ancienne couverture ?',
+      type: 'options',
+      options: [
+        { value: 'oui', label: 'Oui', icon: '🗑️', supplement: '+15€/m²' },
+        { value: 'non', label: 'Non', icon: '❌', supplement: '0€' },
+        { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓', supplement: '+10€/m²' }
+      ]
+    },
+    {
+      id: 'options',
+      question: 'Sélectionnez les options souhaitées',
+      type: 'multiselect',
+      options: [
+        { value: 'velux', label: 'Velux', icon: '🪟', price: '+900€/unité', hasQuantity: true },
+        { value: 'gouttiere', label: 'Gouttières', icon: '💧', price: '+35€/ml' },
+        { value: 'isolation', label: 'Isolation toiture', icon: '🔥', price: '+40€/m²' },
+        { value: 'charpente', label: 'Traitement charpente', icon: '🪵', price: '+25€/m²' },
+        { value: 'ecran_sous_toiture', label: 'Écran sous toiture', icon: '📋', price: '+20€/m²' }
+      ]
+    },
+    {
+      id: 'postalCode',
+      question: 'Votre code postal',
+      type: 'input',
+      inputType: 'text',
+      placeholder: '75001',
+      pattern: '[0-9]{5}',
+      maxLength: 5
+    }
   ];
   
-  const projectTypes = [
-    { value: 'renovation', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
-    { value: 'repair', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
-    { value: 'cleaning', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
-    { value: 'insulation', label: 'Isolation', icon: '🔥', desc: 'Isolation thermique' }
+  // Délai (influence pas le prix, juste collecté)
+  const delayOptions = [
+    { value: 'urgent', label: 'Urgent (moins d\'une semaine)', icon: '🚨' },
+    { value: 'moins_3', label: 'Moins de 3 mois', icon: '📅' },
+    { value: 'moins_6', label: 'Moins de 6 mois', icon: '📆' },
+    { value: 'plus_6', label: 'Plus de 6 mois', icon: '🗓️' },
+    { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
   ];
   
-  const materials = [
-    { value: 'tuile', label: 'Tuile', icon: '🏺' },
-    { value: 'ardoise', label: 'Ardoise', icon: '🪨' },
-    { value: 'zinc', label: 'Zinc', icon: '⚙️' },
-    { value: 'bac_acier', label: 'Bac acier', icon: '🔩' }
-  ];
-  
-  const sidesOptions = [
-    { value: '1', label: '1 pan', icon: '📐' },
-    { value: '2', label: '2 pans', icon: '📏' },
-    { value: '4', label: '4 pans', icon: '🔲' },
-    { value: 'plus', label: 'Plus de 4', icon: '🔳' }
-  ];
-  
-  const accessibilityOptions = [
-    { value: 'plain_pied', label: 'Plain-pied', icon: '🏡' },
-    { value: '1_etage', label: '1 étage', icon: '🏢' },
-    { value: '2_etages', label: '2 étages', icon: '🏗️' },
-    { value: 'plus', label: 'Plus', icon: '🏛️' }
-  ];
-  
-  const additionalOptions = [
-    { value: 'velux', label: 'Velux', icon: '🪟' },
-    { value: 'gouttiere', label: 'Gouttières', icon: '💧' },
-    { value: 'isolation', label: 'Isolation', icon: '🔥' },
-    { value: 'depose', label: 'Dépose toiture', icon: '🗑️' },
-    { value: 'charpente', label: 'Traitement charpente', icon: '🪵' }
-  ];
+  function init() {
+    render();
+  }
   
   function render() {
-    let container = document.getElementById('roof-widget-container');
+    let container = document.getElementById('roof-widget');
     if (!container) {
       container = document.createElement('div');
-      container.id = 'roof-widget-container';
-      container.style.cssText = 'position: fixed; bottom: 100px; right: 20px; width: 420px; max-width: calc(100vw - 40px); z-index: 10000;';
-      document.body.appendChild(container);
+      container.id = 'roof-widget';
+      container.className = 'widget-typeform';
+      const target = document.getElementById('roof-widget-container') || document.body;
+      target.appendChild(container);
     }
     
-    container.innerHTML = `
-      <div style="background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
-        <div style="height: 4px; background: linear-gradient(90deg, #ff6b00, #ff8533); width: ${((currentStep + 1) / steps.length) * 100}%;"></div>
-        <div id="widget-content" style="padding: 24px; max-height: 70vh; overflow-y: auto;"></div>
-      </div>
-    `;
-    
-    renderStep();
-  }
-  
-  function renderStep() {
-    const content = document.getElementById('widget-content');
-    if (!content) return;
-    
-    const step = steps[currentStep];
+    const step = questions[currentStep];
+    const progress = ((currentStep + 1) / (questions.length + 1)) * 100;
     
     let html = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0; font-size: 20px;">${step.title}</h2>
-        <button onclick="document.getElementById('roof-widget-container').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✕</button>
+      <div class="widget-progress">
+        <div class="widget-progress-fill" style="width: ${progress}%;"></div>
       </div>
-      <p style="color: #666; margin-bottom: 24px;">Étape ${currentStep + 1} / ${steps.length}</p>
+      <div class="widget-step-counter">${currentStep + 1} / ${questions.length + 1}</div>
+      <div class="widget-content">
+        <div class="widget-step">
     `;
     
-    if (step.type === 'options') {
-      let options = [];
-      if (step.id === 'projectType') options = projectTypes;
-      if (step.id === 'material') options = materials;
-      if (step.id === 'sides') options = sidesOptions;
-      if (step.id === 'accessibility') options = accessibilityOptions;
+    if (currentStep < questions.length) {
+      // Affichage question normale
+      html += `<h2 class="widget-question">${step.question}</h2>`;
       
-      html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
-      options.forEach(opt => {
-        const isSelected = userResponses[step.id] === opt.value;
-        html += `
-          <div onclick="window.selectOption('${step.id}', '${opt.value}')" style="padding: 16px; border: 2px solid ${isSelected ? '#ff6b00' : '#e5e7eb'}; border-radius: 12px; cursor: pointer; background: ${isSelected ? '#fff7ed' : 'white'}; display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 24px;">${opt.icon}</span>
-            <div><div style="font-weight: 600;">${opt.label}</div>${opt.desc ? `<div style="font-size: 12px; color: #666;">${opt.desc}</div>` : ''}</div>
-          </div>
-        `;
-      });
-      html += '</div>';
-    }
-    
-    if (step.type === 'slider') {
-      const surface = userResponses.surface || 50;
-      html += `
-        <div>
-          <input type="range" id="surface-slider" min="20" max="300" value="${surface}" step="5" style="width: 100%; margin: 20px 0; height: 6px; -webkit-appearance: none; background: #e5e7eb; border-radius: 3px;">
-          <div style="text-align: center; font-size: 28px; font-weight: 700; color: #ff6b00;"><span id="surface-value">${surface}</span> m²</div>
-        </div>
-      `;
-    }
-    
-    if (step.type === 'multiselect') {
-      const selected = userResponses.options || {};
-      html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
-      additionalOptions.forEach(opt => {
-        const isSelected = selected[opt.value];
-        html += `
-          <div onclick="window.toggleOption('${opt.value}')" style="padding: 16px; border: 2px solid ${isSelected ? '#ff6b00' : '#e5e7eb'}; border-radius: 12px; cursor: pointer; background: ${isSelected ? '#fff7ed' : 'white'}; display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 24px;">${opt.icon}</span>
-            <div><div style="font-weight: 600;">${opt.label}</div></div>
-          </div>
-        `;
-      });
-      html += '</div>';
-    }
-    
-    if (step.type === 'input') {
-      html += `
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Code postal</label>
-          <input type="text" id="postal-input" style="width: 100%; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 16px;" placeholder="75001" value="${userResponses.postalCode || ''}" maxlength="5">
-        </div>
-      `;
-    }
-    
-    html += `
-      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 32px;">
-        ${currentStep > 0 ? '<button onclick="window.prevStep()" style="padding: 12px 20px; background: #f3f4f6; border: none; border-radius: 12px; cursor: pointer; font-weight: 500;">Précédent</button>' : '<div></div>'}
-        <button onclick="window.nextStep()" style="padding: 12px 28px; background: #ff6b00; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 500;">${currentStep === steps.length - 1 ? 'Voir estimation' : 'Suivant'}</button>
-      </div>
-    `;
-    
-    content.innerHTML = html;
-    
-    if (step.type === 'slider') {
-      const slider = document.getElementById('surface-slider');
-      const display = document.getElementById('surface-value');
-      if (slider) {
-        slider.addEventListener('input', (e) => {
-          display.textContent = e.target.value;
-          userResponses.surface = parseInt(e.target.value);
-        });
+      switch (step.type) {
+        case 'options':
+          html += renderOptions(step);
+          break;
+        case 'slider':
+          html += renderSlider(step);
+          break;
+        case 'multiselect':
+          html += renderMultiselect(step);
+          break;
+        case 'input':
+          html += renderInput(step);
+          break;
       }
+      
+      html += `
+        </div>
+        <div class="widget-navigation">
+          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()" ${currentStep === 0 ? 'disabled style="opacity:0.5"' : ''}>← Retour</button>
+          <button class="widget-btn widget-btn-next" onclick="window.widgetNext()">Suivant →</button>
+        </div>
+      `;
+    } else if (currentStep === questions.length) {
+      // Écran délai
+      html += `<h2 class="widget-question">Quel est votre délai ?</h2>`;
+      html += `<div class="widget-options">`;
+      delayOptions.forEach(opt => {
+        const isSelected = answers.delay === opt.value;
+        html += `
+          <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetSelectDelay('${opt.value}')">
+            <div class="widget-option-icon">${opt.icon}</div>
+            <div class="widget-option-text">
+              <div class="widget-option-title">${opt.label}</div>
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      html += `
+        </div>
+        <div class="widget-navigation">
+          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()">← Retour</button>
+          <button class="widget-btn widget-btn-next" onclick="window.widgetCalculate()">Voir mon estimation →</button>
+        </div>
+      `;
+    } else if (currentStep === questions.length + 1 && quoteResult) {
+      // Écran résultat
+      html += renderResult();
+    } else if (currentStep === questions.length + 2) {
+      // Écran succès
+      html += renderSuccess();
     }
+    
+    html += `</div></div>`;
+    container.innerHTML = html;
   }
   
-  window.selectOption = (stepId, value) => {
-    userResponses[stepId] = value;
-    renderStep();
-  };
+  function renderOptions(step) {
+    let html = '<div class="widget-options">';
+    step.options.forEach(opt => {
+      const isSelected = answers[step.id] === opt.value;
+      html += `
+        <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetSelectOption('${step.id}', '${opt.value}')">
+          <div class="widget-option-icon">${opt.icon}</div>
+          <div class="widget-option-text">
+            <div class="widget-option-title">${opt.label}</div>
+            ${opt.desc ? `<div class="widget-option-desc">${opt.desc}</div>` : ''}
+            ${opt.supplement ? `<div class="widget-option-desc" style="color: var(--primary);">${opt.supplement}</div>` : ''}
+            ${opt.price ? `<div class="widget-option-desc" style="color: var(--primary);">${opt.price}</div>` : ''}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    return html;
+  }
   
-  window.toggleOption = (value) => {
-    if (!userResponses.options) userResponses.options = {};
-    userResponses.options[value] = !userResponses.options[value];
-    renderStep();
-  };
+  function renderSlider(step) {
+    const value = answers[step.id] || step.default;
+    return `
+      <div class="widget-slider-container">
+        <div class="widget-slider-label">
+          <span>Surface</span>
+          <span id="slider-value-display">${value} ${step.unit}</span>
+        </div>
+        <input type="range" id="surface-slider" min="${step.min}" max="${step.max}" step="${step.step}" value="${value}">
+        <div class="widget-slider-value">
+          <span id="slider-value">${value}</span>
+          <span class="widget-slider-unit">${step.unit}</span>
+        </div>
+      </div>
+    `;
+  }
   
-  window.nextStep = async () => {
-    const step = steps[currentStep];
-    
-    if (step.id === 'postalCode') {
-      const input = document.getElementById('postal-input');
-      if (!input || !input.value || input.value.length !== 5) {
-        alert('Veuillez entrer un code postal valide (5 chiffres)');
-        return;
+  function renderMultiselect(step) {
+    const selected = answers[step.id] || {};
+    let html = '<div class="widget-checkbox-group">';
+    step.options.forEach(opt => {
+      const isSelected = selected[opt.value];
+      html += `
+        <div class="widget-checkbox ${isSelected ? 'selected' : ''}" onclick="window.widgetToggleOption('${step.id}', '${opt.value}')">
+          <div class="widget-checkbox-icon">${opt.icon}</div>
+          <div class="widget-checkbox-label">${opt.label}</div>
+          <div class="widget-checkbox-price">${opt.price}</div>
+          <input type="checkbox" ${isSelected ? 'checked' : ''}>
+        </div>
+      `;
+      if (opt.hasQuantity && selected[opt.value]) {
+        const qty = selected.veluxCount || 1;
+        html += `
+          <div class="widget-quantity">
+            <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.widgetChangeQuantity(-1)">−</button>
+            <span class="widget-quantity-value" id="velux-count">${qty}</span>
+            <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.widgetChangeQuantity(1)">+</button>
+            <span style="font-size: 13px; color: var(--text-light);">Velux</span>
+          </div>
+        `;
       }
-      userResponses.postalCode = input.value;
-    }
-    
-    if (currentStep < steps.length - 1) {
-      currentStep++;
-      renderStep();
-    } else {
-      await calculate();
-    }
-  };
+    });
+    html += '</div>';
+    return html;
+  }
   
-  window.prevStep = () => {
-    if (currentStep > 0) {
-      currentStep--;
-      renderStep();
-    }
-  };
+  function renderInput(step) {
+    const value = answers[step.id] || '';
+    return `
+      <div class="widget-input-group">
+        <input type="${step.inputType}" class="widget-input" id="postal-input" placeholder="${step.placeholder}" maxlength="${step.maxLength}" value="${value}">
+      </div>
+    `;
+  }
   
-  async function calculate() {
-    const content = document.getElementById('widget-content');
-    content.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calcul en cours...</div>';
+  function renderResult() {
+    const complexityLabels = { faible: 'Faible', moyenne: 'Moyenne', elevee: 'Élevée' };
+    const complexityClass = `complexity-${quoteResult.complexity}`;
     
-    const surface = userResponses.surface || 50;
-    const material = userResponses.material || 'tuile';
-    
-    const prices = { tuile: 95, ardoise: 145, zinc: 180, bac_acier: 110 };
-    const pricePerM2 = prices[material];
-    
-    let low = pricePerM2 * surface * 0.85;
-    let high = pricePerM2 * surface * 1.15;
-    
-    if (userResponses.postalCode) {
-      const code = userResponses.postalCode.substring(0, 2);
-      const multipliers = { '75': 1.3, '92': 1.25, '93': 1.2, '94': 1.25 };
-      const mult = multipliers[code] || 1.0;
-      low *= mult;
-      high *= mult;
-    }
-    
-    const days = Math.max(3, Math.floor(surface / 15));
-    
-    content.innerHTML = `
-      <div style="text-align: center; margin-bottom: 24px;">
-        <div style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
-          <div style="color: #666;">Estimation de vos travaux</div>
-          <div style="font-size: 32px; font-weight: 700; color: #ff6b00; margin: 12px 0;">${Math.round(low).toLocaleString()}€ - ${Math.round(high).toLocaleString()}€</div>
-          <div style="background: white; display: inline-block; padding: 8px 16px; border-radius: 50px; font-size: 14px;">⏱️ Délai: ${days} à ${days+3} jours</div>
+    return `
+      <div class="widget-result">
+        <h2 class="widget-question">Votre estimation</h2>
+        <div class="widget-result-price">
+          <div class="widget-result-range">Estimation prévisionnelle</div>
+          <div class="widget-result-amount">${quoteResult.lowEstimate.toLocaleString()}€ - ${quoteResult.highEstimate.toLocaleString()}€</div>
+        </div>
+        <div>
+          <span class="widget-result-badge ${complexityClass}">Complexité : ${complexityLabels[quoteResult.complexity]}</span>
+        </div>
+        <div class="widget-result-days">
+          ⏱️ Durée estimée : ${quoteResult.daysEstimate.min} à ${quoteResult.daysEstimate.max} jours
         </div>
         
-        <div style="text-align: left;">
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Nom complet</label>
-            <input type="text" id="lead-name" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="Jean Dupont">
+        <div style="margin-top: 32px; text-align: left;">
+          <div class="widget-form-group">
+            <label>Nom complet</label>
+            <input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont">
           </div>
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Téléphone</label>
-            <input type="tel" id="lead-phone" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="06 12 34 56 78">
+          <div class="widget-form-group">
+            <label>Téléphone</label>
+            <input type="tel" id="lead-phone" class="widget-input" placeholder="06 12 34 56 78">
           </div>
-          <div style="margin-bottom: 24px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Email</label>
-            <input type="email" id="lead-email" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="contact@exemple.fr">
+          <div class="widget-form-group">
+            <label>Email</label>
+            <input type="email" id="lead-email" class="widget-input" placeholder="contact@exemple.fr">
           </div>
-          
-          <button onclick="window.submitLead()" style="width: 100%; padding: 14px; background: #ff6b00; color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">Recevoir mon estimation</button>
-          <button onclick="window.prevStep()" style="width: 100%; margin-top: 12px; padding: 12px; background: #f3f4f6; border: none; border-radius: 12px; cursor: pointer;">Modifier</button>
+        </div>
+        
+        <div class="widget-navigation">
+          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()">← Modifier</button>
+          <button class="widget-btn widget-btn-submit" onclick="window.widgetSubmit()">Recevoir mon estimation détaillée →</button>
         </div>
       </div>
     `;
   }
   
-  window.submitLead = () => {
+  function renderSuccess() {
+    return `
+      <div class="widget-success">
+        <div class="widget-success-icon">✅</div>
+        <h3 class="widget-success-title">Merci !</h3>
+        <p class="widget-success-message">
+          Votre demande d'estimation a bien été envoyée.<br>
+          Un artisan vous contactera dans les plus brefs délais.
+        </p>
+        <button class="widget-btn widget-btn-next" onclick="window.location.reload()" style="margin-top: 24px;">Nouvelle estimation →</button>
+      </div>
+    `;
+  }
+  
+  // Actions globales
+  window.widgetSelectOption = (id, value) => {
+    answers[id] = value;
+    render();
+  };
+  
+  window.widgetSelectDelay = (value) => {
+    answers.delay = value;
+    render();
+  };
+  
+  window.widgetToggleOption = (id, value) => {
+    if (!answers[id]) answers[id] = {};
+    answers[id][value] = !answers[id][value];
+    render();
+  };
+  
+  window.widgetChangeQuantity = (delta) => {
+    if (!answers.options) answers.options = {};
+    const current = answers.options.veluxCount || 1;
+    const newVal = Math.max(1, current + delta);
+    answers.options.veluxCount = newVal;
+    render();
+  };
+  
+  window.widgetNext = () => {
+    const step = questions[currentStep];
+    if (step) {
+      // Validation
+      if (step.type === 'input') {
+        const input = document.getElementById('postal-input');
+        if (input && (!input.value || input.value.length !== 5)) {
+          alert('Veuillez entrer un code postal valide (5 chiffres)');
+          return;
+        }
+        if (input) answers[step.id] = input.value;
+      }
+      if (step.type === 'slider') {
+        const slider = document.getElementById('surface-slider');
+        if (slider) answers[step.id] = parseInt(slider.value);
+      }
+      if (step.type === 'options' && !answers[step.id]) {
+        alert('Veuillez sélectionner une option');
+        return;
+      }
+    }
+    currentStep++;
+    render();
+    if (step && step.type === 'slider') {
+      setTimeout(setupSlider, 50);
+    }
+  };
+  
+  window.widgetPrev = () => {
+    if (currentStep > 0) {
+      currentStep--;
+      render();
+      if (currentStep < questions.length && questions[currentStep].type === 'slider') {
+        setTimeout(setupSlider, 50);
+      }
+    }
+  };
+  
+  window.widgetCalculate = async () => {
+    // Récupérer la région
+    const postalCode = answers.postalCode || '';
+    let region = 'province';
+    if (postalCode && (postalCode.startsWith('75') || postalCode.startsWith('92') || postalCode.startsWith('93') || postalCode.startsWith('94') || postalCode.startsWith('95'))) {
+      region = 'paris_idf';
+    } else if (postalCode && (postalCode.startsWith('13') || postalCode.startsWith('33') || postalCode.startsWith('59') || postalCode.startsWith('69') || postalCode.startsWith('31'))) {
+      region = 'grande_metropole';
+    } else if (postalCode && postalCode.match(/^[0-9]/)) {
+      region = 'rural';
+    }
+    
+    answers.region = region;
+    
+    try {
+      const response = await fetch('/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license: FORCED_LICENSE, answers })
+      });
+      
+      quoteResult = await response.json();
+      currentStep = questions.length + 1;
+      render();
+    } catch (error) {
+      console.error('Calculation failed:', error);
+      alert('Erreur lors du calcul. Veuillez réessayer.');
+    }
+  };
+  
+  window.widgetSubmit = async () => {
     const name = document.getElementById('lead-name')?.value;
     const phone = document.getElementById('lead-phone')?.value;
     const email = document.getElementById('lead-email')?.value;
@@ -261,21 +470,54 @@
       return;
     }
     
-    const content = document.getElementById('widget-content');
-    content.innerHTML = `
-      <div style="text-align: center; padding: 48px 24px;">
-        <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
-        <h2 style="margin-bottom: 16px;">Merci !</h2>
-        <p style="color: #666;">Votre demande a bien été envoyée.<br>Un expert vous contactera rapidement.</p>
-        <button onclick="document.getElementById('roof-widget-container').remove()" style="margin-top: 24px; padding: 12px 24px; background: #ff6b00; color: white; border: none; border-radius: 12px; cursor: pointer;">Fermer</button>
-      </div>
-    `;
+    if (!email.includes('@')) {
+      alert('Email invalide');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          license: FORCED_LICENSE,
+          leadData: { name, phone, email, postalCode: answers.postalCode, projectData: answers, delay: answers.delay },
+          quoteData: quoteResult
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        currentStep = questions.length + 2;
+        render();
+      }
+    } catch (error) {
+      console.error('Lead submission failed:', error);
+      alert('Erreur lors de l\'envoi. Veuillez réessayer.');
+    }
   };
+  
+  function setupSlider() {
+    const slider = document.getElementById('surface-slider');
+    const valueDisplay = document.getElementById('slider-value');
+    const labelDisplay = document.getElementById('slider-value-display');
+    
+    if (slider) {
+      const update = () => {
+        const val = slider.value;
+        if (valueDisplay) valueDisplay.textContent = val;
+        if (labelDisplay) labelDisplay.textContent = val + ' m²';
+        answers.surface = parseInt(val);
+      };
+      slider.addEventListener('input', update);
+      update();
+    }
+  }
   
   // Démarrage
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', render);
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    render();
+    init();
   }
 })();
