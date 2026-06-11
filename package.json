@@ -1,17 +1,11 @@
 {
   "name": "roof-widget",
   "version": "1.0.0",
-  "description": "Professional roofing quote calculator widget",
   "scripts": {
     "build": "node build.js",
-    "dev": "npm run build",
     "deploy": "npm run build && vercel --prod"
   },
-  "dependencies": {
-    "cors": "^2.8.5"
-  },
   "devDependencies": {
-    "javascript-obfuscator": "^4.1.0",
-    "vercel": "^33.0.0"
+    "javascript-obfuscator": "^4.1.0"
   }
 }
