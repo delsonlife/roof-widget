@@ -1,223 +1,128 @@
-// api/calculate.js — moteur de calcul côté serveur uniquement
-// Les formules et tarifs ne transitent JAMAIS vers le navigateur.
-const fs = require("fs");
-const path = require("path");
+import fs from 'fs';
+import path from 'path';
 
-function getLicenses() {
-  const filePath = path.join(process.cwd(), "data", "licenses.json");
-  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-}
-
-function extractDomain(originOrReferer) {
-  if (!originOrReferer) return null;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  const { license, projectData } = req.body;
+  
+  if (!license || !projectData) {
+    return res.status(400).json({ error: 'License and project data required' });
+  }
+  
   try {
-    const url = new URL(originOrReferer);
-    return url.hostname.replace(/^www\./, "");
-  } catch {
-    return originOrReferer.replace(/^www\./, "").split("/")[0];
-  }
-}
-
-function corsHeaders(origin) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "no-store",
-  };
-}
-
-function getRegionalCoefficient(postalCode, regionalCoefficients) {
-  if (!postalCode) return regionalCoefficients["default"] || 1.0;
-  const prefix2 = postalCode.substring(0, 2);
-  return (
-    regionalCoefficients[prefix2] ||
-    regionalCoefficients["default"] ||
-    1.0
-  );
-}
-
-function calculate(data, pricing) {
-  const {
-    project,
-    material,
-    surface,
-    pans,
-    accessibility,
-    options = [],
-    postalCode,
-  } = data;
-
-  // Prix de base au m²
-  const basePrice = pricing.base[material] || 100;
-
-  // Multiplicateur type de projet
-  const projectMult = pricing.project_multiplier[project] || 1.0;
-
-  // Multiplicateur pans
-  const panMult = pricing.pan_multiplier[pans] || 1.0;
-
-  // Multiplicateur étages
-  const floorMult = pricing.floor_multiplier[accessibility] || 1.0;
-
-  // Coefficient régional
-  const regionalCoeff = getRegionalCoefficient(
-    postalCode,
-    pricing.regional_coefficients
-  );
-
-  // Calcul surface de base
-  const surfaceNum = parseFloat(surface) || 100;
-
-  // Prix matériaux + pose
-  let total = basePrice * surfaceNum * projectMult * panMult * floorMult * regionalCoeff;
-
-  // Options
-  let optionsTotal = 0;
-  const optionDetails = [];
-
-  if (options.includes("velux")) {
-    const cost = pricing.options.velux;
-    optionsTotal += cost;
-    optionDetails.push({ label: "Velux", price: cost });
-  }
-  if (options.includes("gouttieres")) {
-    // Gouttières au mètre linéaire estimé (périmètre ≈ surface^0.5 * 4)
-    const linearMeters = Math.round(Math.sqrt(surfaceNum) * 4);
-    const cost = pricing.options.gouttieres * linearMeters;
-    optionsTotal += cost;
-    optionDetails.push({ label: "Gouttières", price: cost });
-  }
-  if (options.includes("isolation")) {
-    const cost = pricing.options.isolation * surfaceNum;
-    optionsTotal += cost;
-    optionDetails.push({ label: "Isolation", price: cost });
-  }
-  if (options.includes("depose")) {
-    const cost = pricing.options.depose * surfaceNum;
-    optionsTotal += cost;
-    optionDetails.push({ label: "Dépose ancienne toiture", price: cost });
-  }
-  if (options.includes("charpente")) {
-    const cost = pricing.options.charpente * surfaceNum;
-    optionsTotal += cost;
-    optionDetails.push({ label: "Traitement charpente", price: cost });
-  }
-
-  total += optionsTotal;
-
-  // Marges basse / haute
-  const low = Math.round((total * pricing.margin_low) / 100) * 100;
-  const high = Math.round((total * pricing.margin_high) / 100) * 100;
-
-  // Délai estimatif (jours)
-  const baseDays = Math.max(1, Math.round(surfaceNum / 40));
-  const delayLow = Math.max(1, baseDays);
-  const delayHigh = Math.max(2, Math.round(baseDays * 1.5));
-
-  // Détail simplifié (sans révéler les tarifs unitaires)
-  const materialLabels = {
-    tuile: "Tuile",
-    ardoise: "Ardoise",
-    zinc: "Zinc",
-    bac_acier: "Bac acier",
-  };
-
-  const projectLabels = {
-    renovation: "Réfection complète",
-    repair: "Réparation",
-    cleaning: "Démoussage",
-    insulation: "Isolation",
-  };
-
-  return {
-    estimateLow: low,
-    estimateHigh: high,
-    delayLow,
-    delayHigh,
-    details: {
-      project: projectLabels[project] || project,
-      material: materialLabels[material] || material,
-      surface: surfaceNum,
-      optionDetails,
-    },
-  };
-}
-
-module.exports = async (req, res) => {
-  const origin = req.headers.origin || req.headers.referer || "";
-
-  if (req.method === "OPTIONS") {
-    Object.entries(corsHeaders(origin)).forEach(([k, v]) => res.setHeader(k, v));
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  Object.entries(corsHeaders(origin)).forEach(([k, v]) => res.setHeader(k, v));
-
-  const { license, data } = req.body || {};
-
-  if (!license || !data) {
-    return res.status(400).json({ error: "Missing license or data" });
-  }
-
-  const licenses = getLicenses();
-  const config = licenses[license];
-
-  if (!config || !config.active) {
-    return res.status(403).json({ error: "Invalid or inactive license" });
-  }
-
-  // Vérification domaine
-  const requestDomain = extractDomain(origin);
-  const allowedDomain = config.domain.replace(/^www\./, "");
-  const isLocalDev =
-    !requestDomain ||
-    requestDomain === "localhost" ||
-    requestDomain === "127.0.0.1" ||
-    requestDomain.endsWith(".vercel.app");
-
-  if (!isLocalDev && requestDomain !== allowedDomain) {
-    return res.status(403).json({ error: "Domain not authorized" });
-  }
-
-  // Validation des inputs
-  const allowedProjects = ["renovation", "repair", "cleaning", "insulation"];
-  const allowedMaterials = ["tuile", "ardoise", "zinc", "bac_acier"];
-  const allowedPans = ["1", "2", "4", "more"];
-  const allowedAccess = ["plain-pied", "1-etage", "2-etages", "plus"];
-
-  if (!allowedProjects.includes(data.project)) {
-    return res.status(400).json({ error: "Invalid project type" });
-  }
-  if (!allowedMaterials.includes(data.material)) {
-    return res.status(400).json({ error: "Invalid material" });
-  }
-
-  const surface = parseFloat(data.surface);
-  if (isNaN(surface) || surface < 10 || surface > 2000) {
-    return res.status(400).json({ error: "Invalid surface area" });
-  }
-
-  // Vérifier que le service est activé pour cette licence
-  const serviceMap = {
-    renovation: "renovation",
-    repair: "repair",
-    cleaning: "cleaning",
-    insulation: "insulation",
-  };
-  if (!config.services[serviceMap[data.project]]) {
-    return res.status(400).json({ error: "Service not available for this license" });
-  }
-
-  try {
-    const result = calculate(data, config.pricing);
+    const licensesPath = path.join(process.cwd(), 'data', 'licenses.json');
+    const licensesData = JSON.parse(fs.readFileSync(licensesPath, 'utf8'));
+    
+    const licenseData = licensesData[license];
+    
+    if (!licenseData || !licenseData.active) {
+      return res.status(401).json({ error: 'Invalid or inactive license' });
+    }
+    
+    const result = calculateQuote(projectData, licenseData);
+    
     return res.status(200).json(result);
-  } catch (err) {
-    console.error("Calculation error:", err);
-    return res.status(500).json({ error: "Calculation failed" });
+    
+  } catch (error) {
+    console.error('Calculation error:', error);
+    return res.status(500).json({ error: 'Calculation failed' });
   }
-};
+}
+
+function calculateQuote(projectData, licenseData) {
+  const { 
+    projectType, 
+    material, 
+    surface, 
+    numberOfSides, 
+    accessibility,
+    options,
+    postalCode 
+  } = projectData;
+  
+  const { pricing, regionalMultipliers } = licenseData;
+  
+  let basePrice = pricing.baseRate || 500;
+  
+  const materialPrice = pricing[material] || 100;
+  basePrice += materialPrice * surface;
+  
+  const sidesMultiplier = getSidesMultiplier(numberOfSides);
+  basePrice *= sidesMultiplier;
+  
+  const accessibilityMultiplier = getAccessibilityMultiplier(accessibility);
+  basePrice *= accessibilityMultiplier;
+  
+  let optionsCost = 0;
+  if (options) {
+    if (options.velux) optionsCost += pricing.velux * (options.veluxCount || 1);
+    if (options.gouttiere) optionsCost += pricing.gouttiere * surface / 10;
+    if (options.isolation) optionsCost += pricing.isolation * surface;
+    if (options.depose) optionsCost += pricing.depose * surface;
+    if (options.charpente) optionsCost += pricing.charpente * surface / 5;
+  }
+  
+  let regionalMultiplier = 1.0;
+  if (postalCode && regionalMultipliers) {
+    const prefix = postalCode.substring(0, 2);
+    regionalMultiplier = regionalMultipliers[prefix] || 1.0;
+  }
+  
+  const projectMultiplier = getProjectMultiplier(projectType);
+  
+  let finalPrice = (basePrice + optionsCost) * regionalMultiplier * projectMultiplier;
+  
+  const lowEstimate = Math.round(finalPrice * 0.9);
+  const highEstimate = Math.round(finalPrice * 1.1);
+  
+  const daysEstimate = calculateDaysEstimate(surface, projectType, options);
+  
+  return {
+    lowEstimate,
+    highEstimate,
+    averageEstimate: Math.round((lowEstimate + highEstimate) / 2),
+    daysEstimate,
+    currency: '€',
+    breakdown: {
+      basePrice: Math.round(basePrice),
+      materials: Math.round(materialPrice * surface),
+      options: Math.round(optionsCost),
+      regionalAdjustment: Math.round(finalPrice - basePrice - optionsCost)
+    }
+  };
+}
+
+function getSidesMultiplier(sides) {
+  const multipliers = { '1': 1.0, '2': 1.2, '4': 1.5, 'plus': 1.8 };
+  return multipliers[sides] || 1.2;
+}
+
+function getAccessibilityMultiplier(accessibility) {
+  const multipliers = { 'plain_pied': 1.0, '1_etage': 1.15, '2_etages': 1.3, 'plus': 1.5 };
+  return multipliers[accessibility] || 1.0;
+}
+
+function getProjectMultiplier(projectType) {
+  const multipliers = { 'renovation': 1.0, 'repair': 0.6, 'cleaning': 0.3, 'insulation': 0.8 };
+  return multipliers[projectType] || 1.0;
+}
+
+function calculateDaysEstimate(surface, projectType, options) {
+  let days = surface / 20;
+  
+  if (projectType === 'renovation') days *= 1.5;
+  if (projectType === 'repair') days *= 0.8;
+  if (projectType === 'cleaning') days *= 0.5;
+  
+  if (options && options.velux) days += 0.5;
+  if (options && options.isolation) days += 1;
+  if (options && options.charpente) days += 1.5;
+  
+  return {
+    min: Math.max(2, Math.floor(days)),
+    max: Math.max(3, Math.ceil(days * 1.3))
+  };
+}
