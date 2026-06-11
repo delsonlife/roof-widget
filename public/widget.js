@@ -5,8 +5,8 @@
   let answers = { surface: 80 };
   let quoteResult = null;
 
-  // Nombre total d'étapes (questions uniquement, pas délai ni résultat)
-  const TOTAL_QUESTIONS = 12; // 12 questions avant le délai
+  // Nombre total d'étapes (12 questions + 1 délai = 13)
+  const TOTAL_STEPS = 13;
 
   const questions = [
     { id: 'projectType', question: 'Quel est votre projet ?', type: 'options', options: [
@@ -77,11 +77,11 @@
   ];
 
   const delayOptions = [
-    { value: 'urgent', label: 'Urgent', icon: '🚨' },
+    { value: 'urgent', label: 'Urgent (moins d\'une semaine)', icon: '🚨' },
     { value: 'moins_3', label: 'Moins de 3 mois', icon: '📅' },
     { value: 'moins_6', label: 'Moins de 6 mois', icon: '📆' },
     { value: 'plus_6', label: 'Plus de 6 mois', icon: '🗓️' },
-    { value: 'compare', label: 'Je compare', icon: '🔍' }
+    { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
   ];
 
   function init() {
@@ -100,29 +100,29 @@
 
     // Logique des étapes:
     // currentStep 0 à 11 = questions (12 questions)
-    // currentStep 12 = écran délai
+    // currentStep 12 = écran délai (13ème étape)
     // currentStep 13 = résultat
     // currentStep 14 = succès
 
-    if (currentStep < TOTAL_QUESTIONS) {
+    if (currentStep < questions.length) {
       renderQuestion(container);
-    } else if (currentStep === TOTAL_QUESTIONS) {
+    } else if (currentStep === questions.length) {
       renderDelay(container);
-    } else if (currentStep === TOTAL_QUESTIONS + 1 && quoteResult) {
+    } else if (currentStep === questions.length + 1 && quoteResult) {
       renderResult(container);
-    } else if (currentStep === TOTAL_QUESTIONS + 2) {
+    } else if (currentStep === questions.length + 2) {
       renderSuccess(container);
     }
   }
 
   function renderQuestion(container) {
     const q = questions[currentStep];
-    // Progression basée sur les questions uniquement (pas délai)
-    const progress = ((currentStep + 1) / TOTAL_QUESTIONS) * 100;
+    // Progression: currentStep+1 sur TOTAL_STEPS (13)
+    const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
     
     let html = `
       <div class="widget-progress"><div class="widget-progress-fill" style="width: ${progress}%;"></div></div>
-      <div class="widget-step-counter">${currentStep + 1} / ${TOTAL_QUESTIONS}</div>
+      <div class="widget-step-counter">${currentStep + 1} / ${TOTAL_STEPS}</div>
       <div class="widget-content">
         <div class="widget-step">
           <h2 class="widget-question">${q.question}</h2>
@@ -208,9 +208,12 @@
   }
 
   function renderDelay(container) {
+    // Étape 13/13
+    const progress = 100;
+    
     let html = `
-      <div class="widget-progress"><div class="widget-progress-fill" style="width: 100%;"></div></div>
-      <div class="widget-step-counter">${TOTAL_QUESTIONS + 1} / ${TOTAL_QUESTIONS + 1}</div>
+      <div class="widget-progress"><div class="widget-progress-fill" style="width: ${progress}%;"></div></div>
+      <div class="widget-step-counter">${questions.length + 1} / ${TOTAL_STEPS}</div>
       <div class="widget-content">
         <div class="widget-step">
           <h2 class="widget-question">Quel est votre délai ?</h2>
@@ -334,24 +337,24 @@
     }
     
     // Passer à l'étape suivante
-    if (currentStep < TOTAL_QUESTIONS - 1) {
+    if (currentStep < questions.length - 1) {
       currentStep++;
       render();
     } else {
-      // Dernière question, aller à l'écran délai
-      currentStep = TOTAL_QUESTIONS;
+      // Dernière question (12/13), aller à l'écran délai (13/13)
+      currentStep = questions.length;
       render();
     }
   };
 
   window.prevStep = () => {
-    if (currentStep === TOTAL_QUESTIONS) {
+    if (currentStep === questions.length) {
       // Revenir à la dernière question
-      currentStep = TOTAL_QUESTIONS - 1;
+      currentStep = questions.length - 1;
       render();
-    } else if (currentStep === TOTAL_QUESTIONS + 1) {
+    } else if (currentStep === questions.length + 1) {
       // Revenir à l'écran délai
-      currentStep = TOTAL_QUESTIONS;
+      currentStep = questions.length;
       render();
     } else if (currentStep > 0) {
       currentStep--;
@@ -360,6 +363,12 @@
   };
 
   window.calculateQuote = async () => {
+    // Vérifier que le délai a été sélectionné
+    if (!answers.delay) {
+      alert('Veuillez sélectionner un délai');
+      return;
+    }
+    
     const required = ['projectType', 'buildingType', 'surface', 'material', 'age', 'state', 'sides', 'pente', 'accessibility', 'depose', 'postalCode'];
     const missing = required.filter(r => !answers[r]);
     
@@ -381,7 +390,7 @@
       });
       
       quoteResult = await response.json();
-      currentStep = TOTAL_QUESTIONS + 1;
+      currentStep = questions.length + 1;
       render();
     } catch (error) {
       alert('Erreur lors du calcul: ' + error.message);
@@ -409,7 +418,7 @@
         })
       });
       
-      currentStep = TOTAL_QUESTIONS + 2;
+      currentStep = questions.length + 2;
       render();
     } catch (error) {
       alert('Erreur lors de l\'envoi');
