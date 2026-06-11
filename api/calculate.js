@@ -1,28 +1,78 @@
 import fs from 'fs';
 import path from 'path';
 
+// Domaines autorisés (vérifiés par licence)
+const LICENSES = {
+  DMP2024: {
+    domain: 'd-m-nageur1.vercel.app',
+    allowedOrigins: [
+      'https://d-m-nageur1.vercel.app',
+      'https://www.d-m-nageur1.vercel.app'
+    ]
+  }
+  // Ajoutez d'autres licences ici
+};
+
 export default async function handler(req, res) {
+  // 1. Gérer la requête OPTIONS (preflight CORS)
+  if (req.method === 'OPTIONS') {
+    // Les headers CORS seront ajoutés après vérification de l'origine
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
   const { license, answers } = req.body;
   
-  if (!license || !answers) {
-    return res.status(400).json({ error: 'License and answers required' });
+  // 2. Vérifier que la licence est fournie
+  if (!license) {
+    return res.status(401).json({ error: 'License key required' });
   }
   
+  // 3. Vérifier que la licence existe
+  const licenseData = LICENSES[license];
+  if (!licenseData) {
+    return res.status(403).json({ error: 'Invalid license key' });
+  }
+  
+  // 4. Vérifier l'origine de la requête
+  const origin = req.headers.origin;
+  const isValidOrigin = licenseData.allowedOrigins.includes(origin);
+  
+  if (!isValidOrigin) {
+    return res.status(403).json({ 
+      error: 'Origin not authorized for this license',
+      origin: origin,
+      expected: licenseData.allowedOrigins
+    });
+  }
+  
+  // 5. Ajouter le header CORS avec l'origine spécifique (pas *)
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
   try {
+    // 6. Charger la configuration du client depuis licenses.json
     const licensesPath = path.join(process.cwd(), 'data', 'licenses.json');
     const licensesData = JSON.parse(fs.readFileSync(licensesPath, 'utf8'));
     
-    const licenseData = licensesData[license];
-    
-    if (!licenseData || !licenseData.active) {
-      return res.status(401).json({ error: 'Invalid or inactive license' });
+    const clientConfig = licensesData[license];
+    if (!clientConfig || !clientConfig.active) {
+      return res.status(403).json({ error: 'License inactive or not found' });
     }
     
-    const result = calculateQuote(answers, licenseData);
+    // 7. Vérifier que le domaine correspond aussi (double sécurité)
+    const hostname = req.headers.host?.split(':')[0];
+    if (!clientConfig.domainPattern.includes(hostname) && hostname !== clientConfig.domain) {
+      // Log pour debug
+      console.warn(`Domain mismatch: ${hostname} vs ${clientConfig.domain}`);
+    }
+    
+    // 8. Calculer le devis
+    const result = calculateQuote(answers, clientConfig);
     
     return res.status(200).json(result);
     
@@ -32,14 +82,14 @@ export default async function handler(req, res) {
   }
 }
 
-function calculateQuote(answers, licenseData) {
-  const { pricing, coefficients } = licenseData;
+function calculateQuote(answers, config) {
+  const { pricing, coefficients } = config;
   
-  // 1. Prix de base : surface × prix matériau
+  // Prix de base : surface × prix matériau
   const materialPrice = pricing.materials[answers.material] || 120;
   let total = answers.surface * materialPrice;
   
-  // 2. Appliquer les coefficients multiplicatifs
+  // Appliquer les coefficients
   total *= coefficients.project[answers.projectType] || 1.0;
   total *= coefficients.building[answers.buildingType] || 1.0;
   total *= coefficients.age[answers.age] || 1.0;
@@ -47,11 +97,10 @@ function calculateQuote(answers, licenseData) {
   total *= coefficients.sides[answers.sides] || 1.0;
   total *= coefficients.pente[answers.pente] || 1.0;
   
-  // 3. Coefficient régional
+  // Coefficient régional
   const regionCoeff = coefficients.region[answers.region] || 1.0;
   total *= regionCoeff;
   
-  // 4. Ajouter les suppléments fixes
   // Accessibilité
   const accessCost = pricing.accessibility[answers.accessibility] || 0;
   total += accessCost;
@@ -71,98 +120,47 @@ function calculateQuote(answers, licenseData) {
   }
   total += optionsCost;
   
-  // 5. Fourchette finale (±10%)
+  // Fourchette finale (±10%)
   const lowEstimate = Math.round(total * 0.9);
   const highEstimate = Math.round(total * 1.1);
-  const average = Math.round((lowEstimate + highEstimate) / 2);
   
-  // 6. Complexité du chantier
-  const complexityScore = calculateComplexity(answers, coefficients);
-  const complexity = getComplexityLevel(complexityScore, licenseData.complexityRules);
+  // Complexité
+  const complexity = calculateComplexity(answers);
   
-  // 7. Durée estimée
-  const days = calculateDays(answers, complexity, licenseData.daysEstimate);
+  // Durée
+  const days = calculateDays(answers, complexity);
   
   return {
     lowEstimate,
     highEstimate,
-    averageEstimate: average,
+    averageEstimate: Math.round((lowEstimate + highEstimate) / 2),
     complexity,
-    complexityScore,
-    daysEstimate: days,
-    breakdown: {
-      basePrice: Math.round(answers.surface * materialPrice),
-      materialMultiplier: materialPrice,
-      coefficients: {
-        project: coefficients.project[answers.projectType],
-        building: coefficients.building[answers.buildingType],
-        age: coefficients.age[answers.age],
-        state: coefficients.state[answers.state],
-        sides: coefficients.sides[answers.sides],
-        pente: coefficients.pente[answers.pente],
-        region: regionCoeff
-      },
-      extras: {
-        accessibility: accessCost,
-        depose: Math.round(deposeCost * answers.surface),
-        options: Math.round(optionsCost)
-      }
-    }
+    daysEstimate: days
   };
 }
 
-function calculateComplexity(answers, coefficients) {
+function calculateComplexity(answers) {
   let score = 1.0;
   
-  // Plus l'état est dégradé, plus c'est complexe
-  const stateComplexity = {
-    'bon': 0.5,
-    'moyen': 1.0,
-    'degrade': 1.5,
-    'tres_degrade': 2.0
-  };
+  const stateComplexity = { bon: 0.5, moyen: 1.0, degrade: 1.5, tres_degrade: 2.0 };
   score += stateComplexity[answers.state] || 0;
   
-  // Plus il y a de pans, plus c'est complexe
-  const sidesComplexity = {
-    '1': 0,
-    '2': 0.3,
-    '4': 0.6,
-    'plus': 1.0
-  };
+  const sidesComplexity = { 1: 0, 2: 0.3, 4: 0.6, plus: 1.0 };
   score += sidesComplexity[answers.sides] || 0;
   
-  // Pente forte = complexité
-  const penteComplexity = {
-    'faible': 0,
-    'moyenne': 0.2,
-    'forte': 0.5,
-    'tres_forte': 1.0
-  };
+  const penteComplexity = { faible: 0, moyenne: 0.2, forte: 0.5, tres_forte: 1.0 };
   score += penteComplexity[answers.pente] || 0;
   
-  // Accessibilité
-  const accessComplexity = {
-    'plain_pied': 0,
-    '1_etage': 0.3,
-    '2_etages': 0.6,
-    '3_etages_plus': 1.0
-  };
+  const accessComplexity = { plain_pied: 0, 1_etage: 0.3, 2_etages: 0.6, 3_etages_plus: 1.0 };
   score += accessComplexity[answers.accessibility] || 0;
   
-  return Math.min(score, 3.0);
-}
-
-function getComplexityLevel(score, rules) {
   if (score < 1.2) return 'faible';
   if (score < 2.0) return 'moyenne';
   return 'elevee';
 }
 
-function calculateDays(answers, complexity, daysEstimate) {
-  const surface = answers.surface;
-  const baseDays = Math.ceil(surface / 50);
-  
+function calculateDays(answers, complexity) {
+  const baseDays = Math.ceil(answers.surface / 50);
   let multiplier = 1.0;
   if (complexity === 'moyenne') multiplier = 1.5;
   if (complexity === 'elevee') multiplier = 2.0;
