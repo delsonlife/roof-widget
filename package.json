@@ -2,19 +2,15 @@
   "name": "roof-widget",
   "version": "1.0.0",
   "description": "Professional roofing quote calculator widget",
-  "main": "api/calculate.js",
   "scripts": {
-    "build": "npm run minify && npm run obfuscate",
-    "minify": "terser public/widget.js -o public/widget.min.js --compress --mangle",
-    "obfuscate": "javascript-obfuscator public/widget.min.js --output public/widget.min.js --compact true --self-defending false --dead-code-injection false --debug-protection false --disable-console-output false",
-    "dev": "node server.js",
-    "deploy": "vercel --prod"
+    "build": "node build.js",
+    "dev": "npm run build",
+    "deploy": "npm run build && vercel --prod"
   },
   "dependencies": {
     "cors": "^2.8.5"
   },
   "devDependencies": {
-    "terser": "^5.30.0",
     "javascript-obfuscator": "^4.1.0",
     "vercel": "^33.0.0"
   }
