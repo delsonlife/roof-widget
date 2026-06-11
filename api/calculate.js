@@ -1,22 +1,52 @@
+
 import fs from 'fs';
 import path from 'path';
 
-// Domaines autorisés (vérifiés par licence)
-const LICENSES = {
-  DMP2024: {
-    domain: 'd-m-nageur1.vercel.app',
-    allowedOrigins: [
-      'https://d-m-nageur1.vercel.app',
-      'https://www.d-m-nageur1.vercel.app'
-    ]
+// Cache pour éviter de relire le fichier à chaque requête
+let licensesCache = null;
+let licensesLastLoad = 0;
+const CACHE_TTL = 60000; // 60 secondes
+
+function getLicenses() {
+  const now = Date.now();
+  if (!licensesCache || (now - licensesLastLoad) > CACHE_TTL) {
+    const licensesPath = path.join(process.cwd(), 'data', 'licenses.json');
+    licensesCache = JSON.parse(fs.readFileSync(licensesPath, 'utf8'));
+    licensesLastLoad = now;
   }
-  // Ajoutez d'autres licences ici
-};
+  return licensesCache;
+}
+
+// Générer un token temporaire (optionnel)
+function generateToken(license, timestamp) {
+  // À implémenter avec un secret partagé
+  // return crypto.createHmac('sha256', SECRET).update(`${license}:${timestamp}`).digest('hex');
+  return null;
+}
 
 export default async function handler(req, res) {
-  // 1. Gérer la requête OPTIONS (preflight CORS)
+  // 1. Gérer OPTIONS (preflight CORS) CORRECTEMENT
   if (req.method === 'OPTIONS') {
-    // Les headers CORS seront ajoutés après vérification de l'origine
+    const origin = req.headers.origin;
+    const licenses = getLicenses();
+    
+    // Vérifier si l'origine est autorisée pour une licence
+    let isAllowedOrigin = false;
+    for (const [key, config] of Object.entries(licenses)) {
+      if (config.active && config.allowedOrigins?.includes(origin)) {
+        isAllowedOrigin = true;
+        break;
+      }
+    }
+    
+    if (isAllowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
     return res.status(200).end();
   }
   
@@ -24,58 +54,51 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  const { license, answers } = req.body;
+  const { license, answers, token } = req.body;
   
-  // 2. Vérifier que la licence est fournie
+  // 2. Vérifier la licence
   if (!license) {
     return res.status(401).json({ error: 'License key required' });
   }
   
-  // 3. Vérifier que la licence existe
-  const licenseData = LICENSES[license];
-  if (!licenseData) {
-    return res.status(403).json({ error: 'Invalid license key' });
+  const licenses = getLicenses();
+  const licenseData = licenses[license];
+  
+  if (!licenseData || !licenseData.active) {
+    return res.status(403).json({ error: 'Invalid or inactive license' });
   }
   
-  // 4. Vérifier l'origine de la requête
+  // 3. Vérifier l'origine (CORS) - La VRAIE vérification
   const origin = req.headers.origin;
-  const isValidOrigin = licenseData.allowedOrigins.includes(origin);
+  const allowedOrigins = licenseData.allowedOrigins || [licenseData.domain];
+  const isValidOrigin = allowedOrigins.includes(origin);
   
   if (!isValidOrigin) {
     return res.status(403).json({ 
       error: 'Origin not authorized for this license',
       origin: origin,
-      expected: licenseData.allowedOrigins
+      allowed: allowedOrigins
     });
   }
   
-  // 5. Ajouter le header CORS avec l'origine spécifique (pas *)
+  // 4. Ajouter les headers CORS avec l'origine spécifique
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
+  // 5. Vérification optionnelle du token (si implémentée)
+  if (licenseData.secret && token) {
+    // Vérifier le token
+    // const expectedToken = generateToken(license, answers.timestamp);
+    // if (token !== expectedToken) {
+    //   return res.status(403).json({ error: 'Invalid token' });
+    // }
+  }
+  
+  // 6. Calculer le devis
   try {
-    // 6. Charger la configuration du client depuis licenses.json
-    const licensesPath = path.join(process.cwd(), 'data', 'licenses.json');
-    const licensesData = JSON.parse(fs.readFileSync(licensesPath, 'utf8'));
-    
-    const clientConfig = licensesData[license];
-    if (!clientConfig || !clientConfig.active) {
-      return res.status(403).json({ error: 'License inactive or not found' });
-    }
-    
-    // 7. Vérifier que le domaine correspond aussi (double sécurité)
-    const hostname = req.headers.host?.split(':')[0];
-    if (!clientConfig.domainPattern.includes(hostname) && hostname !== clientConfig.domain) {
-      // Log pour debug
-      console.warn(`Domain mismatch: ${hostname} vs ${clientConfig.domain}`);
-    }
-    
-    // 8. Calculer le devis
-    const result = calculateQuote(answers, clientConfig);
-    
+    const result = calculateQuote(answers, licenseData);
     return res.status(200).json(result);
-    
   } catch (error) {
     console.error('Calculation error:', error);
     return res.status(500).json({ error: 'Calculation failed' });
@@ -96,18 +119,13 @@ function calculateQuote(answers, config) {
   total *= coefficients.state[answers.state] || 1.0;
   total *= coefficients.sides[answers.sides] || 1.0;
   total *= coefficients.pente[answers.pente] || 1.0;
-  
-  // Coefficient régional
-  const regionCoeff = coefficients.region[answers.region] || 1.0;
-  total *= regionCoeff;
+  total *= coefficients.region[answers.region] || 1.0;
   
   // Accessibilité
-  const accessCost = pricing.accessibility[answers.accessibility] || 0;
-  total += accessCost;
+  total += pricing.accessibility[answers.accessibility] || 0;
   
   // Dépose
-  const deposeCost = pricing.depose[answers.depose] || 0;
-  total += deposeCost * answers.surface;
+  total += (pricing.depose[answers.depose] || 0) * answers.surface;
   
   // Options
   let optionsCost = 0;
@@ -124,7 +142,7 @@ function calculateQuote(answers, config) {
   const lowEstimate = Math.round(total * 0.9);
   const highEstimate = Math.round(total * 1.1);
   
-  // Complexité
+  // Complexité (avec seuils calibrés)
   const complexity = calculateComplexity(answers);
   
   // Durée
@@ -140,33 +158,38 @@ function calculateQuote(answers, config) {
 }
 
 function calculateComplexity(answers) {
-  let score = 1.0;
+  let score = 0;
   
-  const stateComplexity = { bon: 0.5, moyen: 1.0, degrade: 1.5, tres_degrade: 2.0 };
-  score += stateComplexity[answers.state] || 0;
+  // État (0-3)
+  const stateScore = { bon: 0, moyen: 0.5, degrade: 1, tres_degrade: 1.5 };
+  score += stateScore[answers.state] || 0;
   
-  const sidesComplexity = { 1: 0, 2: 0.3, 4: 0.6, plus: 1.0 };
-  score += sidesComplexity[answers.sides] || 0;
+  // Pans (0-1.5)
+  const sidesScore = { 1: 0, 2: 0.3, 4: 0.6, plus: 1 };
+  score += sidesScore[answers.sides] || 0;
   
-  const penteComplexity = { faible: 0, moyenne: 0.2, forte: 0.5, tres_forte: 1.0 };
-  score += penteComplexity[answers.pente] || 0;
+  // Pente (0-1)
+  const penteScore = { faible: 0, moyenne: 0.2, forte: 0.5, tres_forte: 0.8 };
+  score += penteScore[answers.pente] || 0;
   
-  const accessComplexity = { plain_pied: 0, 1_etage: 0.3, 2_etages: 0.6, 3_etages_plus: 1.0 };
-  score += accessComplexity[answers.accessibility] || 0;
+  // Accessibilité (0-1)
+  const accessScore = { plain_pied: 0, 1_etage: 0.3, 2_etages: 0.6, 3_etages_plus: 0.9 };
+  score += accessScore[answers.accessibility] || 0;
   
-  if (score < 1.2) return 'faible';
-  if (score < 2.0) return 'moyenne';
+  // Seuils calibrés
+  if (score < 1) return 'faible';
+  if (score < 1.8) return 'moyenne';
   return 'elevee';
 }
 
 function calculateDays(answers, complexity) {
   const baseDays = Math.ceil(answers.surface / 50);
   let multiplier = 1.0;
-  if (complexity === 'moyenne') multiplier = 1.5;
-  if (complexity === 'elevee') multiplier = 2.0;
+  if (complexity === 'moyenne') multiplier = 1.3;
+  if (complexity === 'elevee') multiplier = 1.8;
   
-  const min = Math.max(1, Math.floor(baseDays * multiplier * 0.8));
-  const max = Math.max(2, Math.ceil(baseDays * multiplier * 1.2));
+  const min = Math.max(1, Math.floor(baseDays * multiplier));
+  const max = Math.max(2, Math.ceil(baseDays * multiplier * 1.3));
   
   return { min, max };
 }
