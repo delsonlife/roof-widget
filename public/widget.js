@@ -1,155 +1,87 @@
 (function() {
-  // Configuration
-  const FORCED_LICENSE = 'DMP2024';
   const API_BASE = 'https://roof-widget.vercel.app';
+  const LICENSE_KEY = 'DMP2024';
   let currentStep = 0;
-  let answers = {
-    surface: 80  // Valeur par défaut
-  };
+  let answers = { surface: 80 };
   let quoteResult = null;
 
-  // Définition des questions
+  // Nombre total d'étapes (questions uniquement, pas délai ni résultat)
+  const TOTAL_QUESTIONS = 12; // 12 questions avant le délai
+
   const questions = [
-    {
-      id: 'projectType',
-      question: 'Quel est votre projet ?',
-      type: 'options',
-      options: [
-        { value: 'refection_complete', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
-        { value: 'reparation', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
-        { value: 'demoussage', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
-        { value: 'isolation', label: 'Isolation de toiture', icon: '🔥', desc: 'Isolation thermique' },
-        { value: 'recherche_fuite', label: 'Recherche de fuite', icon: '💧', desc: 'Détection et réparation' }
-      ]
-    },
-    {
-      id: 'buildingType',
-      question: 'Quel type de bâtiment ?',
-      type: 'options',
-      options: [
-        { value: 'maison', label: 'Maison individuelle', icon: '🏡' },
-        { value: 'garage', label: 'Garage', icon: '🚗' },
-        { value: 'dependance', label: 'Dépendance', icon: '🏚️' },
-        { value: 'immeuble', label: 'Immeuble', icon: '🏢' },
-        { value: 'local_pro', label: 'Local professionnel', icon: '🏭' }
-      ]
-    },
-    {
-      id: 'surface',
-      question: 'Quelle est la surface approximative ?',
-      type: 'slider',
-      min: 20,
-      max: 500,
-      step: 5,
-      unit: 'm²',
-      default: 80
-    },
-    {
-      id: 'material',
-      question: 'Quel est le matériau de couverture ?',
-      type: 'options',
-      options: [
-        { value: 'tuile', label: 'Tuile terre cuite', icon: '🏺', price: '120 €/m²' },
-        { value: 'ardoise', label: 'Ardoise naturelle', icon: '🪨', price: '220 €/m²' },
-        { value: 'zinc', label: 'Zinc', icon: '⚙️', price: '200 €/m²' },
-        { value: 'bac_acier', label: 'Bac acier', icon: '🔩', price: '90 €/m²' }
-      ]
-    },
-    {
-      id: 'age',
-      question: 'Quel âge a votre toiture ?',
-      type: 'options',
-      options: [
-        { value: 'moins_10', label: 'Moins de 10 ans', icon: '🆕' },
-        { value: '10_20', label: '10 à 20 ans', icon: '📅' },
-        { value: '20_30', label: '20 à 30 ans', icon: '📆' },
-        { value: 'plus_30', label: 'Plus de 30 ans', icon: '🏚️' },
-        { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓' }
-      ]
-    },
-    {
-      id: 'state',
-      question: 'Quel est l\'état général de la toiture ?',
-      type: 'options',
-      options: [
-        { value: 'bon', label: 'Bon état', icon: '✅', desc: 'Quelques tuiles à remplacer' },
-        { value: 'moyen', label: 'État moyen', icon: '⚠️', desc: 'Usure visible' },
-        { value: 'degrade', label: 'Dégradée', icon: '🔧', desc: 'Fuite possible' },
-        { value: 'tres_degrade', label: 'Très dégradée', icon: '🚨', desc: 'Urgence' }
-      ]
-    },
-    {
-      id: 'sides',
-      question: 'Combien de pans comporte votre toiture ?',
-      type: 'options',
-      options: [
-        { value: '1', label: '1 pan', icon: '📐' },
-        { value: '2', label: '2 pans', icon: '📏' },
-        { value: '4', label: '4 pans', icon: '🔲' },
-        { value: 'plus', label: 'Plus de 4 pans', icon: '🔳' }
-      ]
-    },
-    {
-      id: 'pente',
-      question: 'Quelle est la pente du toit ?',
-      type: 'options',
-      options: [
-        { value: 'faible', label: 'Faible (moins de 15°)', icon: '📉' },
-        { value: 'moyenne', label: 'Moyenne (15°-30°)', icon: '➡️' },
-        { value: 'forte', label: 'Forte (30°-45°)', icon: '📈' },
-        { value: 'tres_forte', label: 'Très forte (plus de 45°)', icon: '⛰️' }
-      ]
-    },
-    {
-      id: 'accessibility',
-      question: 'Accessibilité du chantier ?',
-      type: 'options',
-      options: [
-        { value: 'plain_pied', label: 'Plain-pied', icon: '🏡', supplement: '0€' },
-        { value: '1_etage', label: '1 étage', icon: '🏢', supplement: '+800€' },
-        { value: '2_etages', label: '2 étages', icon: '🏗️', supplement: '+1800€' },
-        { value: '3_etages_plus', label: '3 étages ou plus', icon: '🏛️', supplement: '+3000€' }
-      ]
-    },
-    {
-      id: 'depose',
-      question: 'Faut-il déposer l\'ancienne couverture ?',
-      type: 'options',
-      options: [
-        { value: 'oui', label: 'Oui', icon: '🗑️', supplement: '+15€/m²' },
-        { value: 'non', label: 'Non', icon: '❌', supplement: '0€' },
-        { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓', supplement: '+10€/m²' }
-      ]
-    },
-    {
-      id: 'options',
-      question: 'Sélectionnez les options souhaitées',
-      type: 'multiselect',
-      options: [
-        { value: 'velux', label: 'Velux', icon: '🪟', price: '+900€/unité', hasQuantity: true },
-        { value: 'gouttiere', label: 'Gouttières', icon: '💧', price: '+35€/ml' },
-        { value: 'isolation', label: 'Isolation toiture', icon: '🔥', price: '+40€/m²' },
-        { value: 'charpente', label: 'Traitement charpente', icon: '🪵', price: '+25€/m²' },
-        { value: 'ecran_sous_toiture', label: 'Écran sous toiture', icon: '📋', price: '+20€/m²' }
-      ]
-    },
-    {
-      id: 'postalCode',
-      question: 'Votre code postal',
-      type: 'input',
-      inputType: 'text',
-      placeholder: '75001',
-      pattern: '[0-9]{5}',
-      maxLength: 5
-    }
+    { id: 'projectType', question: 'Quel est votre projet ?', type: 'options', options: [
+      { value: 'refection_complete', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
+      { value: 'reparation', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
+      { value: 'demoussage', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
+      { value: 'isolation', label: 'Isolation de toiture', icon: '🔥', desc: 'Isolation thermique' },
+      { value: 'recherche_fuite', label: 'Recherche de fuite', icon: '💧', desc: 'Détection et réparation' }
+    ] },
+    { id: 'buildingType', question: 'Quel type de bâtiment ?', type: 'options', options: [
+      { value: 'maison', label: 'Maison individuelle', icon: '🏡' },
+      { value: 'garage', label: 'Garage', icon: '🚗' },
+      { value: 'dependance', label: 'Dépendance', icon: '🏚️' },
+      { value: 'immeuble', label: 'Immeuble', icon: '🏢' },
+      { value: 'local_pro', label: 'Local professionnel', icon: '🏭' }
+    ] },
+    { id: 'surface', question: 'Quelle est la surface approximative ?', type: 'slider', min: 20, max: 500, step: 5, unit: 'm²', default: 80 },
+    { id: 'material', question: 'Quel est le matériau de couverture ?', type: 'options', options: [
+      { value: 'tuile', label: 'Tuile terre cuite', icon: '🏺' },
+      { value: 'ardoise', label: 'Ardoise naturelle', icon: '🪨' },
+      { value: 'zinc', label: 'Zinc', icon: '⚙️' },
+      { value: 'bac_acier', label: 'Bac acier', icon: '🔩' }
+    ] },
+    { id: 'age', question: 'Quel âge a votre toiture ?', type: 'options', options: [
+      { value: 'moins_10', label: 'Moins de 10 ans', icon: '🆕' },
+      { value: '10_20', label: '10 à 20 ans', icon: '📅' },
+      { value: '20_30', label: '20 à 30 ans', icon: '📆' },
+      { value: 'plus_30', label: 'Plus de 30 ans', icon: '🏚️' },
+      { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓' }
+    ] },
+    { id: 'state', question: 'Quel est l\'état général de la toiture ?', type: 'options', options: [
+      { value: 'bon', label: 'Bon état', icon: '✅' },
+      { value: 'moyen', label: 'État moyen', icon: '⚠️' },
+      { value: 'degrade', label: 'Dégradée', icon: '🔧' },
+      { value: 'tres_degrade', label: 'Très dégradée', icon: '🚨' }
+    ] },
+    { id: 'sides', question: 'Combien de pans comporte votre toiture ?', type: 'options', options: [
+      { value: '1', label: '1 pan', icon: '📐' },
+      { value: '2', label: '2 pans', icon: '📏' },
+      { value: '4', label: '4 pans', icon: '🔲' },
+      { value: 'plus', label: 'Plus de 4 pans', icon: '🔳' }
+    ] },
+    { id: 'pente', question: 'Quelle est la pente du toit ?', type: 'options', options: [
+      { value: 'faible', label: 'Faible', icon: '📉' },
+      { value: 'moyenne', label: 'Moyenne', icon: '➡️' },
+      { value: 'forte', label: 'Forte', icon: '📈' },
+      { value: 'tres_forte', label: 'Très forte', icon: '⛰️' }
+    ] },
+    { id: 'accessibility', question: 'Accessibilité du chantier ?', type: 'options', options: [
+      { value: 'plain_pied', label: 'Plain-pied', icon: '🏡' },
+      { value: '1_etage', label: '1 étage', icon: '🏢' },
+      { value: '2_etages', label: '2 étages', icon: '🏗️' },
+      { value: '3_etages_plus', label: '3 étages ou plus', icon: '🏛️' }
+    ] },
+    { id: 'depose', question: 'Faut-il déposer l\'ancienne couverture ?', type: 'options', options: [
+      { value: 'oui', label: 'Oui', icon: '🗑️' },
+      { value: 'non', label: 'Non', icon: '❌' },
+      { value: 'je_ne_sais_pas', label: 'Je ne sais pas', icon: '❓' }
+    ] },
+    { id: 'options', question: 'Options supplémentaires', type: 'multiselect', options: [
+      { value: 'velux', label: 'Velux', icon: '🪟', hasQuantity: true },
+      { value: 'gouttiere', label: 'Gouttières', icon: '💧' },
+      { value: 'isolation', label: 'Isolation', icon: '🔥' },
+      { value: 'charpente', label: 'Traitement charpente', icon: '🪵' },
+      { value: 'ecran', label: 'Écran sous toiture', icon: '📋' }
+    ] },
+    { id: 'postalCode', question: 'Votre code postal', type: 'input', placeholder: '75001' }
   ];
 
   const delayOptions = [
-    { value: 'urgent', label: 'Urgent (moins d\'une semaine)', icon: '🚨' },
+    { value: 'urgent', label: 'Urgent', icon: '🚨' },
     { value: 'moins_3', label: 'Moins de 3 mois', icon: '📅' },
     { value: 'moins_6', label: 'Moins de 6 mois', icon: '📆' },
     { value: 'plus_6', label: 'Plus de 6 mois', icon: '🗓️' },
-    { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
+    { value: 'compare', label: 'Je compare', icon: '🔍' }
   ];
 
   function init() {
@@ -166,375 +98,338 @@
       target.appendChild(container);
     }
 
-    const step = questions[currentStep];
-    const progress = ((currentStep + 1) / (questions.length + 1)) * 100;
+    // Logique des étapes:
+    // currentStep 0 à 11 = questions (12 questions)
+    // currentStep 12 = écran délai
+    // currentStep 13 = résultat
+    // currentStep 14 = succès
 
+    if (currentStep < TOTAL_QUESTIONS) {
+      renderQuestion(container);
+    } else if (currentStep === TOTAL_QUESTIONS) {
+      renderDelay(container);
+    } else if (currentStep === TOTAL_QUESTIONS + 1 && quoteResult) {
+      renderResult(container);
+    } else if (currentStep === TOTAL_QUESTIONS + 2) {
+      renderSuccess(container);
+    }
+  }
+
+  function renderQuestion(container) {
+    const q = questions[currentStep];
+    // Progression basée sur les questions uniquement (pas délai)
+    const progress = ((currentStep + 1) / TOTAL_QUESTIONS) * 100;
+    
     let html = `
-      <div class="widget-progress">
-        <div class="widget-progress-fill" style="width: ${progress}%;"></div>
-      </div>
-      <div class="widget-step-counter">${currentStep + 1} / ${questions.length + 1}</div>
+      <div class="widget-progress"><div class="widget-progress-fill" style="width: ${progress}%;"></div></div>
+      <div class="widget-step-counter">${currentStep + 1} / ${TOTAL_QUESTIONS}</div>
       <div class="widget-content">
         <div class="widget-step">
+          <h2 class="widget-question">${q.question}</h2>
     `;
-
-    if (currentStep < questions.length) {
-      html += `<h2 class="widget-question">${step.question}</h2>`;
-
-      switch (step.type) {
-        case 'options':
-          html += renderOptions(step);
-          break;
-        case 'slider':
-          html += renderSlider(step);
-          break;
-        case 'multiselect':
-          html += renderMultiselect(step);
-          break;
-        case 'input':
-          html += renderInput(step);
-          break;
-      }
-
-      html += `
-        </div>
-        <div class="widget-navigation">
-          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()" ${currentStep === 0 ? 'disabled style="opacity:0.5"' : ''}>← Retour</button>
-          <button class="widget-btn widget-btn-next" onclick="window.widgetNext()">Suivant →</button>
-        </div>
-      `;
-    } else if (currentStep === questions.length) {
-      html += `<h2 class="widget-question">Quel est votre délai ?</h2>`;
-      html += `<div class="widget-options">`;
-      delayOptions.forEach(opt => {
-        const isSelected = answers.delay === opt.value;
+    
+    if (q.type === 'options') {
+      html += '<div class="widget-options">';
+      q.options.forEach(opt => {
+        const isSelected = answers[q.id] === opt.value;
         html += `
-          <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetSelectDelay('${opt.value}')">
+          <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.selectOption('${q.id}', '${opt.value}')">
             <div class="widget-option-icon">${opt.icon}</div>
             <div class="widget-option-text">
               <div class="widget-option-title">${opt.label}</div>
+              ${opt.desc ? `<div class="widget-option-desc">${opt.desc}</div>` : ''}
             </div>
           </div>
         `;
       });
-      html += `</div>`;
+      html += '</div>';
+    }
+    
+    if (q.type === 'slider') {
+      const val = answers.surface || 80;
       html += `
-        </div>
-        <div class="widget-navigation">
-          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()">← Retour</button>
-          <button class="widget-btn widget-btn-next" onclick="window.widgetCalculate()">Voir mon estimation →</button>
+        <div class="widget-slider-container">
+          <div class="widget-slider-label"><span>Surface</span><span id="slider-value-display">${val} m²</span></div>
+          <input type="range" id="surface-slider" min="20" max="500" step="5" value="${val}">
+          <div class="widget-slider-value"><span id="slider-value">${val}</span> <span class="widget-slider-unit">m²</span></div>
         </div>
       `;
-    } else if (currentStep === questions.length + 1 && quoteResult) {
-      html += renderResult();
-    } else if (currentStep === questions.length + 2) {
-      html += renderSuccess();
     }
-
-    html += `</div></div>`;
+    
+    if (q.type === 'multiselect') {
+      const selected = answers[q.id] || {};
+      html += '<div class="widget-checkbox-group">';
+      q.options.forEach(opt => {
+        const isSelected = selected[opt.value];
+        html += `
+          <div class="widget-checkbox ${isSelected ? 'selected' : ''}" onclick="window.toggleOption('${q.id}', '${opt.value}')">
+            <div class="widget-checkbox-icon">${opt.icon}</div>
+            <div class="widget-checkbox-label">${opt.label}</div>
+            <input type="checkbox" ${isSelected ? 'checked' : ''}>
+          </div>
+        `;
+        if (opt.hasQuantity && selected[opt.value]) {
+          const qty = selected.veluxCount || 1;
+          html += `
+            <div class="widget-quantity">
+              <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.changeQuantity(-1)">−</button>
+              <span class="widget-quantity-value">${qty}</span>
+              <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.changeQuantity(1)">+</button>
+              <span>Velux</span>
+            </div>
+          `;
+        }
+      });
+      html += '</div>';
+    }
+    
+    if (q.type === 'input') {
+      html += `
+        <div class="widget-input-group">
+          <input type="text" class="widget-input" id="postal-input" placeholder="${q.placeholder}" maxlength="5" value="${answers[q.id] || ''}">
+        </div>
+      `;
+    }
+    
+    html += `
+        </div>
+        <div class="widget-navigation">
+          <button class="widget-btn widget-btn-prev" onclick="window.prevStep()" ${currentStep === 0 ? 'disabled' : ''}>← Retour</button>
+          <button class="widget-btn widget-btn-next" onclick="window.nextStep()">Suivant →</button>
+        </div>
+      </div>
+    `;
+    
     container.innerHTML = html;
     
-    // Ré-attacher les événements du slider après le rendu
-    if (currentStep < questions.length && questions[currentStep].type === 'slider') {
-      setTimeout(setupSlider, 50);
+    if (q.type === 'slider') {
+      setupSlider();
     }
   }
 
-  function renderOptions(step) {
-    let html = '<div class="widget-options">';
-    step.options.forEach(opt => {
-      const isSelected = answers[step.id] === opt.value;
+  function renderDelay(container) {
+    let html = `
+      <div class="widget-progress"><div class="widget-progress-fill" style="width: 100%;"></div></div>
+      <div class="widget-step-counter">${TOTAL_QUESTIONS + 1} / ${TOTAL_QUESTIONS + 1}</div>
+      <div class="widget-content">
+        <div class="widget-step">
+          <h2 class="widget-question">Quel est votre délai ?</h2>
+          <div class="widget-options">
+    `;
+    
+    delayOptions.forEach(opt => {
+      const isSelected = answers.delay === opt.value;
       html += `
-        <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetSelectOption('${step.id}', '${opt.value}')">
+        <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.selectDelay('${opt.value}')">
           <div class="widget-option-icon">${opt.icon}</div>
           <div class="widget-option-text">
             <div class="widget-option-title">${opt.label}</div>
-            ${opt.desc ? `<div class="widget-option-desc">${opt.desc}</div>` : ''}
-            ${opt.supplement ? `<div class="widget-option-desc" style="color: #ff6b00;">${opt.supplement}</div>` : ''}
-            ${opt.price ? `<div class="widget-option-desc" style="color: #ff6b00;">${opt.price}</div>` : ''}
           </div>
         </div>
       `;
     });
-    html += '</div>';
-    return html;
-  }
-
-  function renderSlider(step) {
-    const value = answers.surface || step.default;
-    return `
-      <div class="widget-slider-container">
-        <div class="widget-slider-label">
-          <span>Surface</span>
-          <span id="slider-value-display">${value} ${step.unit}</span>
-        </div>
-        <input type="range" id="surface-slider" min="${step.min}" max="${step.max}" step="${step.step}" value="${value}">
-        <div class="widget-slider-value">
-          <span id="slider-value">${value}</span>
-          <span class="widget-slider-unit">${step.unit}</span>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderMultiselect(step) {
-    const selected = answers[step.id] || {};
-    let html = '<div class="widget-checkbox-group">';
-    step.options.forEach(opt => {
-      const isSelected = selected[opt.value];
-      html += `
-        <div class="widget-checkbox ${isSelected ? 'selected' : ''}" onclick="window.widgetToggleOption('${step.id}', '${opt.value}')">
-          <div class="widget-checkbox-icon">${opt.icon}</div>
-          <div class="widget-checkbox-label">${opt.label}</div>
-          <div class="widget-checkbox-price">${opt.price}</div>
-          <input type="checkbox" ${isSelected ? 'checked' : ''}>
-        </div>
-      `;
-      if (opt.hasQuantity && selected[opt.value]) {
-        const qty = selected.veluxCount || 1;
-        html += `
-          <div class="widget-quantity">
-            <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.widgetChangeQuantity(-1)">−</button>
-            <span class="widget-quantity-value" id="velux-count">${qty}</span>
-            <button class="widget-quantity-btn" onclick="event.stopPropagation(); window.widgetChangeQuantity(1)">+</button>
-            <span style="font-size: 13px; color: #64748b;">Velux</span>
-          </div>
-        `;
-      }
-    });
-    html += '</div>';
-    return html;
-  }
-
-  function renderInput(step) {
-    const value = answers[step.id] || '';
-    return `
-      <div class="widget-input-group">
-        <input type="${step.inputType}" class="widget-input" id="postal-input" placeholder="${step.placeholder}" maxlength="${step.maxLength}" value="${value}">
-      </div>
-    `;
-  }
-
-  function renderResult() {
-    const complexityLabels = { faible: 'Faible', moyenne: 'Moyenne', elevee: 'Élevée' };
-    const complexityClass = `complexity-${quoteResult.complexity}`;
-
-    return `
-      <div class="widget-result">
-        <h2 class="widget-question">Votre estimation</h2>
-        <div class="widget-result-price">
-          <div class="widget-result-range">Estimation prévisionnelle</div>
-          <div class="widget-result-amount">${quoteResult.lowEstimate.toLocaleString()}€ - ${quoteResult.highEstimate.toLocaleString()}€</div>
-        </div>
-        <div>
-          <span class="widget-result-badge ${complexityClass}">Complexité : ${complexityLabels[quoteResult.complexity]}</span>
-        </div>
-        <div class="widget-result-days">
-          ⏱️ Durée estimée : ${quoteResult.daysEstimate.min} à ${quoteResult.daysEstimate.max} jours
-        </div>
-
-        <div style="margin-top: 32px; text-align: left;">
-          <div class="widget-form-group">
-            <label>Nom complet</label>
-            <input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont">
-          </div>
-          <div class="widget-form-group">
-            <label>Téléphone</label>
-            <input type="tel" id="lead-phone" class="widget-input" placeholder="06 12 34 56 78">
-          </div>
-          <div class="widget-form-group">
-            <label>Email</label>
-            <input type="email" id="lead-email" class="widget-input" placeholder="contact@exemple.fr">
+    
+    html += `
           </div>
         </div>
-
         <div class="widget-navigation">
-          <button class="widget-btn widget-btn-prev" onclick="window.widgetPrev()">← Modifier</button>
-          <button class="widget-btn widget-btn-submit" onclick="window.widgetSubmit()">Recevoir mon estimation détaillée →</button>
+          <button class="widget-btn widget-btn-prev" onclick="window.prevStep()">← Retour</button>
+          <button class="widget-btn widget-btn-next" onclick="window.calculateQuote()">Voir mon estimation →</button>
+        </div>
+      </div>
+    `;
+    
+    container.innerHTML = html;
+  }
+
+  function renderResult(container) {
+    const html = `
+      <div class="widget-content">
+        <div class="widget-step">
+          <h2 class="widget-question">Votre estimation</h2>
+          <div class="widget-result-price">
+            <div class="widget-result-range">Estimation prévisionnelle</div>
+            <div class="widget-result-amount">${quoteResult.lowEstimate.toLocaleString()}€ - ${quoteResult.highEstimate.toLocaleString()}€</div>
+          </div>
+          <div class="widget-result-days">⏱️ Durée estimée : ${quoteResult.daysEstimate.min} à ${quoteResult.daysEstimate.max} jours</div>
+          
+          <div style="margin-top: 32px; text-align: left;">
+            <div class="widget-form-group">
+              <label>Nom complet</label>
+              <input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont">
+            </div>
+            <div class="widget-form-group">
+              <label>Téléphone</label>
+              <input type="tel" id="lead-phone" class="widget-input" placeholder="06 12 34 56 78">
+            </div>
+            <div class="widget-form-group">
+              <label>Email</label>
+              <input type="email" id="lead-email" class="widget-input" placeholder="contact@exemple.fr">
+            </div>
+          </div>
+          
+          <div class="widget-navigation">
+            <button class="widget-btn widget-btn-prev" onclick="window.prevStep()">← Modifier</button>
+            <button class="widget-btn widget-btn-submit" onclick="window.submitLead()">Recevoir mon estimation →</button>
+          </div>
+        </div>
+      </div>
+    `;
+    container.innerHTML = html;
+  }
+
+  function renderSuccess(container) {
+    container.innerHTML = `
+      <div class="widget-content">
+        <div class="widget-step" style="text-align: center;">
+          <div style="font-size: 64px; margin-bottom: 24px;">✅</div>
+          <h2 class="widget-question">Merci !</h2>
+          <p style="color: #64748b;">Votre demande a bien été envoyée.<br>Un artisan vous contactera rapidement.</p>
+          <button class="widget-btn widget-btn-next" onclick="location.reload()" style="margin-top: 24px;">Nouvelle estimation →</button>
         </div>
       </div>
     `;
   }
 
-  function renderSuccess() {
-    return `
-      <div class="widget-success">
-        <div class="widget-success-icon">✅</div>
-        <h3 class="widget-success-title">Merci !</h3>
-        <p class="widget-success-message">
-          Votre demande d'estimation a bien été envoyée.<br>
-          Un artisan vous contactera dans les plus brefs délais.
-        </p>
-        <button class="widget-btn widget-btn-next" onclick="window.location.reload()" style="margin-top: 24px;">Nouvelle estimation →</button>
-      </div>
-    `;
-  }
-
-  window.widgetSelectOption = (id, value) => {
+  window.selectOption = (id, value) => {
     answers[id] = value;
     render();
   };
 
-  window.widgetSelectDelay = (value) => {
+  window.selectDelay = (value) => {
     answers.delay = value;
     render();
   };
 
-  window.widgetToggleOption = (id, value) => {
+  window.toggleOption = (id, value) => {
     if (!answers[id]) answers[id] = {};
     answers[id][value] = !answers[id][value];
     render();
   };
 
-  window.widgetChangeQuantity = (delta) => {
+  window.changeQuantity = (delta) => {
     if (!answers.options) answers.options = {};
     const current = answers.options.veluxCount || 1;
-    const newVal = Math.max(1, current + delta);
-    answers.options.veluxCount = newVal;
+    answers.options.veluxCount = Math.max(1, current + delta);
     render();
   };
 
-  window.widgetNext = () => {
-    const step = questions[currentStep];
+  window.nextStep = () => {
+    const q = questions[currentStep];
     
-    if (step) {
-      // Validation selon le type
-      if (step.type === 'input') {
-        const input = document.getElementById('postal-input');
-        if (!input || !input.value || input.value.length !== 5) {
-          alert('Veuillez entrer un code postal valide (5 chiffres)');
+    if (q.type === 'input') {
+      const input = document.getElementById('postal-input');
+      if (input && input.value) {
+        if (input.value.length !== 5) {
+          alert('Code postal invalide (5 chiffres)');
           return;
         }
-        answers[step.id] = input.value;
-      }
-      
-      if (step.type === 'options' && !answers[step.id]) {
-        alert('Veuillez sélectionner une option');
-        return;
+        answers[q.id] = input.value;
       }
     }
     
-    currentStep++;
-    render();
+    if (q.type === 'options' && !answers[q.id]) {
+      alert('Veuillez sélectionner une option');
+      return;
+    }
+    
+    // Passer à l'étape suivante
+    if (currentStep < TOTAL_QUESTIONS - 1) {
+      currentStep++;
+      render();
+    } else {
+      // Dernière question, aller à l'écran délai
+      currentStep = TOTAL_QUESTIONS;
+      render();
+    }
   };
 
-  window.widgetPrev = () => {
-    if (currentStep > 0) {
+  window.prevStep = () => {
+    if (currentStep === TOTAL_QUESTIONS) {
+      // Revenir à la dernière question
+      currentStep = TOTAL_QUESTIONS - 1;
+      render();
+    } else if (currentStep === TOTAL_QUESTIONS + 1) {
+      // Revenir à l'écran délai
+      currentStep = TOTAL_QUESTIONS;
+      render();
+    } else if (currentStep > 0) {
       currentStep--;
       render();
     }
   };
 
-  window.widgetCalculate = async () => {
-    // Vérifier que toutes les réponses essentielles sont présentes
+  window.calculateQuote = async () => {
     const required = ['projectType', 'buildingType', 'surface', 'material', 'age', 'state', 'sides', 'pente', 'accessibility', 'depose', 'postalCode'];
     const missing = required.filter(r => !answers[r]);
     
     if (missing.length > 0) {
-      console.error('Réponses manquantes:', missing);
-      alert('Veuillez répondre à toutes les questions avant de voir l\'estimation');
+      alert('Veuillez répondre à toutes les questions');
       return;
     }
-
-    // Déterminer la région
-    const postalCode = answers.postalCode || '';
-    let region = 'province';
-    if (postalCode && (postalCode.startsWith('75') || postalCode.startsWith('92') || postalCode.startsWith('93') || postalCode.startsWith('94') || postalCode.startsWith('95'))) {
-      region = 'paris_idf';
-    } else if (postalCode && (postalCode.startsWith('13') || postalCode.startsWith('33') || postalCode.startsWith('59') || postalCode.startsWith('69') || postalCode.startsWith('31'))) {
-      region = 'grande_metropole';
-    } else if (postalCode && postalCode.match(/^[0-9]/)) {
-      region = 'rural';
-    }
-    answers.region = region;
-
-    // Afficher un indicateur de chargement
+    
     const container = document.getElementById('widget-content');
     if (container) {
       container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calcul en cours...</div>';
     }
-
+    
     try {
       const response = await fetch(`${API_BASE}/api/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license: FORCED_LICENSE, answers })
+        body: JSON.stringify({ license: LICENSE_KEY, answers })
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
+      
       quoteResult = await response.json();
-      currentStep = questions.length + 1;
+      currentStep = TOTAL_QUESTIONS + 1;
       render();
     } catch (error) {
-      console.error('Calculation failed:', error);
-      alert('Erreur lors du calcul. Veuillez réessayer.\n\nDétail technique: ' + error.message);
+      alert('Erreur lors du calcul: ' + error.message);
     }
   };
 
-  window.widgetSubmit = async () => {
+  window.submitLead = async () => {
     const name = document.getElementById('lead-name')?.value;
     const phone = document.getElementById('lead-phone')?.value;
     const email = document.getElementById('lead-email')?.value;
-
+    
     if (!name || !phone || !email) {
       alert('Veuillez remplir tous les champs');
       return;
     }
-
-    if (!email.includes('@')) {
-      alert('Email invalide');
-      return;
-    }
-
+    
     try {
-      const response = await fetch(`${API_BASE}/api/lead`, {
+      await fetch(`${API_BASE}/api/lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          license: FORCED_LICENSE,
-          leadData: { name, phone, email, postalCode: answers.postalCode, projectData: answers, delay: answers.delay },
+          license: LICENSE_KEY,
+          leadData: { name, phone, email, postalCode: answers.postalCode, projectData: answers },
           quoteData: quoteResult
         })
       });
-
-      const result = await response.json();
-      if (result.success) {
-        currentStep = questions.length + 2;
-        render();
-      } else {
-        alert('Erreur lors de l\'envoi. Veuillez réessayer.');
-      }
+      
+      currentStep = TOTAL_QUESTIONS + 2;
+      render();
     } catch (error) {
-      console.error('Lead submission failed:', error);
-      alert('Erreur lors de l\'envoi. Veuillez réessayer.');
+      alert('Erreur lors de l\'envoi');
     }
   };
 
   function setupSlider() {
     const slider = document.getElementById('surface-slider');
-    const valueDisplay = document.getElementById('slider-value');
-    const labelDisplay = document.getElementById('slider-value-display');
-
     if (slider) {
-      // Mettre à jour la valeur initiale
       const update = () => {
         const val = parseInt(slider.value);
-        if (valueDisplay) valueDisplay.textContent = val;
-        if (labelDisplay) labelDisplay.textContent = val + ' m²';
+        document.getElementById('slider-value').textContent = val;
+        document.getElementById('slider-value-display').textContent = val + ' m²';
         answers.surface = val;
       };
-      
       slider.addEventListener('input', update);
-      update(); // Appel immédiat pour initialiser
+      update();
     }
   }
 
-  // Démarrage
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
