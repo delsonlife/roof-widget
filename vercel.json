@@ -19,5 +19,15 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/widget.js",
+      "destination": "/public/widget.js"
+    },
+    {
+      "source": "/widget.css",
+      "destination": "/public/widget.css"
+    }
   ]
 }
