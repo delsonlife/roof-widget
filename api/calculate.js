@@ -6,10 +6,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  const { license, projectData } = req.body;
+  const { license, answers } = req.body;
   
-  if (!license || !projectData) {
-    return res.status(400).json({ error: 'License and project data required' });
+  if (!license || !answers) {
+    return res.status(400).json({ error: 'License and answers required' });
   }
   
   try {
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid or inactive license' });
     }
     
-    const result = calculateQuote(projectData, licenseData);
+    const result = calculateQuote(answers, licenseData);
     
     return res.status(200).json(result);
     
@@ -32,97 +32,143 @@ export default async function handler(req, res) {
   }
 }
 
-function calculateQuote(projectData, licenseData) {
-  const { 
-    projectType, 
-    material, 
-    surface, 
-    numberOfSides, 
-    accessibility,
-    options,
-    postalCode 
-  } = projectData;
+function calculateQuote(answers, licenseData) {
+  const { pricing, coefficients } = licenseData;
   
-  const { pricing, regionalMultipliers } = licenseData;
+  // 1. Prix de base : surface × prix matériau
+  const materialPrice = pricing.materials[answers.material] || 120;
+  let total = answers.surface * materialPrice;
   
-  let basePrice = pricing.baseRate || 500;
+  // 2. Appliquer les coefficients multiplicatifs
+  total *= coefficients.project[answers.projectType] || 1.0;
+  total *= coefficients.building[answers.buildingType] || 1.0;
+  total *= coefficients.age[answers.age] || 1.0;
+  total *= coefficients.state[answers.state] || 1.0;
+  total *= coefficients.sides[answers.sides] || 1.0;
+  total *= coefficients.pente[answers.pente] || 1.0;
   
-  const materialPrice = pricing[material] || 100;
-  basePrice += materialPrice * surface;
+  // 3. Coefficient régional
+  const regionCoeff = coefficients.region[answers.region] || 1.0;
+  total *= regionCoeff;
   
-  const sidesMultiplier = getSidesMultiplier(numberOfSides);
-  basePrice *= sidesMultiplier;
+  // 4. Ajouter les suppléments fixes
+  // Accessibilité
+  const accessCost = pricing.accessibility[answers.accessibility] || 0;
+  total += accessCost;
   
-  const accessibilityMultiplier = getAccessibilityMultiplier(accessibility);
-  basePrice *= accessibilityMultiplier;
+  // Dépose
+  const deposeCost = pricing.depose[answers.depose] || 0;
+  total += deposeCost * answers.surface;
   
+  // Options
   let optionsCost = 0;
-  if (options) {
-    if (options.velux) optionsCost += pricing.velux * (options.veluxCount || 1);
-    if (options.gouttiere) optionsCost += pricing.gouttiere * surface / 10;
-    if (options.isolation) optionsCost += pricing.isolation * surface;
-    if (options.depose) optionsCost += pricing.depose * surface;
-    if (options.charpente) optionsCost += pricing.charpente * surface / 5;
+  if (answers.options) {
+    if (answers.options.velux) optionsCost += pricing.options.velux * (answers.options.veluxCount || 1);
+    if (answers.options.gouttiere) optionsCost += pricing.options.gouttiere * (answers.surface / 10);
+    if (answers.options.isolation) optionsCost += pricing.options.isolation * answers.surface;
+    if (answers.options.charpente) optionsCost += pricing.options.charpente * answers.surface;
+    if (answers.options.ecran_sous_toiture) optionsCost += pricing.options.ecran_sous_toiture * answers.surface;
   }
+  total += optionsCost;
   
-  let regionalMultiplier = 1.0;
-  if (postalCode && regionalMultipliers) {
-    const prefix = postalCode.substring(0, 2);
-    regionalMultiplier = regionalMultipliers[prefix] || 1.0;
-  }
+  // 5. Fourchette finale (±10%)
+  const lowEstimate = Math.round(total * 0.9);
+  const highEstimate = Math.round(total * 1.1);
+  const average = Math.round((lowEstimate + highEstimate) / 2);
   
-  const projectMultiplier = getProjectMultiplier(projectType);
+  // 6. Complexité du chantier
+  const complexityScore = calculateComplexity(answers, coefficients);
+  const complexity = getComplexityLevel(complexityScore, licenseData.complexityRules);
   
-  let finalPrice = (basePrice + optionsCost) * regionalMultiplier * projectMultiplier;
-  
-  const lowEstimate = Math.round(finalPrice * 0.9);
-  const highEstimate = Math.round(finalPrice * 1.1);
-  
-  const daysEstimate = calculateDaysEstimate(surface, projectType, options);
+  // 7. Durée estimée
+  const days = calculateDays(answers, complexity, licenseData.daysEstimate);
   
   return {
     lowEstimate,
     highEstimate,
-    averageEstimate: Math.round((lowEstimate + highEstimate) / 2),
-    daysEstimate,
-    currency: '€',
+    averageEstimate: average,
+    complexity,
+    complexityScore,
+    daysEstimate: days,
     breakdown: {
-      basePrice: Math.round(basePrice),
-      materials: Math.round(materialPrice * surface),
-      options: Math.round(optionsCost),
-      regionalAdjustment: Math.round(finalPrice - basePrice - optionsCost)
+      basePrice: Math.round(answers.surface * materialPrice),
+      materialMultiplier: materialPrice,
+      coefficients: {
+        project: coefficients.project[answers.projectType],
+        building: coefficients.building[answers.buildingType],
+        age: coefficients.age[answers.age],
+        state: coefficients.state[answers.state],
+        sides: coefficients.sides[answers.sides],
+        pente: coefficients.pente[answers.pente],
+        region: regionCoeff
+      },
+      extras: {
+        accessibility: accessCost,
+        depose: Math.round(deposeCost * answers.surface),
+        options: Math.round(optionsCost)
+      }
     }
   };
 }
 
-function getSidesMultiplier(sides) {
-  const multipliers = { '1': 1.0, '2': 1.2, '4': 1.5, 'plus': 1.8 };
-  return multipliers[sides] || 1.2;
-}
-
-function getAccessibilityMultiplier(accessibility) {
-  const multipliers = { 'plain_pied': 1.0, '1_etage': 1.15, '2_etages': 1.3, 'plus': 1.5 };
-  return multipliers[accessibility] || 1.0;
-}
-
-function getProjectMultiplier(projectType) {
-  const multipliers = { 'renovation': 1.0, 'repair': 0.6, 'cleaning': 0.3, 'insulation': 0.8 };
-  return multipliers[projectType] || 1.0;
-}
-
-function calculateDaysEstimate(surface, projectType, options) {
-  let days = surface / 20;
+function calculateComplexity(answers, coefficients) {
+  let score = 1.0;
   
-  if (projectType === 'renovation') days *= 1.5;
-  if (projectType === 'repair') days *= 0.8;
-  if (projectType === 'cleaning') days *= 0.5;
-  
-  if (options && options.velux) days += 0.5;
-  if (options && options.isolation) days += 1;
-  if (options && options.charpente) days += 1.5;
-  
-  return {
-    min: Math.max(2, Math.floor(days)),
-    max: Math.max(3, Math.ceil(days * 1.3))
+  // Plus l'état est dégradé, plus c'est complexe
+  const stateComplexity = {
+    'bon': 0.5,
+    'moyen': 1.0,
+    'degrade': 1.5,
+    'tres_degrade': 2.0
   };
+  score += stateComplexity[answers.state] || 0;
+  
+  // Plus il y a de pans, plus c'est complexe
+  const sidesComplexity = {
+    '1': 0,
+    '2': 0.3,
+    '4': 0.6,
+    'plus': 1.0
+  };
+  score += sidesComplexity[answers.sides] || 0;
+  
+  // Pente forte = complexité
+  const penteComplexity = {
+    'faible': 0,
+    'moyenne': 0.2,
+    'forte': 0.5,
+    'tres_forte': 1.0
+  };
+  score += penteComplexity[answers.pente] || 0;
+  
+  // Accessibilité
+  const accessComplexity = {
+    'plain_pied': 0,
+    '1_etage': 0.3,
+    '2_etages': 0.6,
+    '3_etages_plus': 1.0
+  };
+  score += accessComplexity[answers.accessibility] || 0;
+  
+  return Math.min(score, 3.0);
+}
+
+function getComplexityLevel(score, rules) {
+  if (score < 1.2) return 'faible';
+  if (score < 2.0) return 'moyenne';
+  return 'elevee';
+}
+
+function calculateDays(answers, complexity, daysEstimate) {
+  const surface = answers.surface;
+  const baseDays = Math.ceil(surface / 50);
+  
+  let multiplier = 1.0;
+  if (complexity === 'moyenne') multiplier = 1.5;
+  if (complexity === 'elevee') multiplier = 2.0;
+  
+  const min = Math.max(1, Math.floor(baseDays * multiplier * 0.8));
+  const max = Math.max(2, Math.ceil(baseDays * multiplier * 1.2));
+  
+  return { min, max };
 }
