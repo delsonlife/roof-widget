@@ -1,13 +1,13 @@
 {
-  "ABC123": {
-    "domain": "couvreur-paris.fr",
-    "domainPattern": "*.couvreur-paris.fr",
+  "DMP2024": {
+    "domain": "d-m-nageur1.vercel.app",
+    "domainPattern": "*.vercel.app",
     "active": true,
     "branding": {
       "primaryColor": "#ff6b00",
       "secondaryColor": "#ff8533",
-      "logo": "https://couvreur-paris.fr/logo.png",
-      "companyName": "Couvreur Paris Expert"
+      "logo": "",
+      "companyName": "Couverture Paris Pro"
     },
     "services": {
       "renovation": true,
@@ -33,43 +33,46 @@
       "93": 1.2,
       "94": 1.25,
       "95": 1.2,
-      "33": 1.1,
-      "69": 1.15,
-      "13": 1.2
+      "77": 1.15,
+      "78": 1.2,
+      "91": 1.1,
+      "95": 1.2
     }
   },
-  "XYZ789": {
-    "domain": "toiture-lyon.fr",
-    "domainPattern": "*.toiture-lyon.fr",
+  "ABC123": {
+    "domain": "roof-widget.vercel.app",
+    "domainPattern": "*.vercel.app",
     "active": true,
     "branding": {
-      "primaryColor": "#004080",
-      "secondaryColor": "#0066cc",
-      "logo": "https://toiture-lyon.fr/logo.png",
-      "companyName": "Toiture Lyon Pro"
+      "primaryColor": "#ff6b00",
+      "secondaryColor": "#ff8533",
+      "logo": "",
+      "companyName": "Roof Widget Demo"
     },
     "services": {
       "renovation": true,
       "repair": true,
       "cleaning": true,
-      "insulation": false
+      "insulation": true
     },
     "pricing": {
-      "tuile": 85,
-      "ardoise": 135,
-      "zinc": 165,
-      "bac_acier": 100,
-      "velux": 1100,
-      "gouttiere": 32,
-      "isolation": 40,
-      "depose": 22,
-      "charpente": 60,
-      "baseRate": 450
+      "tuile": 95,
+      "ardoise": 145,
+      "zinc": 180,
+      "bac_acier": 110,
+      "velux": 1200,
+      "gouttiere": 35,
+      "isolation": 45,
+      "depose": 25,
+      "charpente": 65,
+      "baseRate": 500
     },
     "regionalMultipliers": {
-      "69": 1.1,
-      "38": 1.05,
-      "74": 1.08
+      "75": 1.3,
+      "92": 1.25,
+      "93": 1.2,
+      "94": 1.25,
+      "95": 1.2
     }
   }
 }
