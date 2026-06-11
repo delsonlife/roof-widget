@@ -1,0 +1,257 @@
+{
+  "version": "1.0.0",
+  "template": {
+    "name": "toiture",
+    "displayName": "Calculateur Devis Toiture",
+    "description": "Widget professionnel pour l'estimation de travaux de toiture",
+    "language": "fr-FR",
+    "currency": "EUR"
+  },
+  "questions": [
+    {
+      "id": "projectType",
+      "question": "Quel est votre projet ?",
+      "type": "single",
+      "required": true,
+      "options": [
+        {
+          "value": "renovation",
+          "label": "Réfection complète",
+          "icon": "🏠",
+          "description": "Toiture entière à refaire"
+        },
+        {
+          "value": "repair",
+          "label": "Réparation",
+          "icon": "🔧",
+          "description": "Réparation localisée"
+        },
+        {
+          "value": "cleaning",
+          "label": "Démoussage",
+          "icon": "🧹",
+          "description": "Nettoyage et traitement"
+        },
+        {
+          "value": "insulation",
+          "label": "Isolation toiture",
+          "icon": "🔥",
+          "description": "Isolation thermique"
+        }
+      ]
+    },
+    {
+      "id": "material",
+      "question": "Quel matériau ?",
+      "type": "single",
+      "required": true,
+      "options": [
+        {
+          "value": "tuile",
+          "label": "Tuile",
+          "icon": "🏺"
+        },
+        {
+          "value": "ardoise",
+          "label": "Ardoise",
+          "icon": "🪨"
+        },
+        {
+          "value": "zinc",
+          "label": "Zinc",
+          "icon": "⚙️"
+        },
+        {
+          "value": "bac_acier",
+          "label": "Bac acier",
+          "icon": "🔩"
+        }
+      ]
+    },
+    {
+      "id": "surface",
+      "question": "Surface estimée du toit",
+      "type": "slider",
+      "required": true,
+      "min": 20,
+      "max": 300,
+      "step": 5,
+      "default": 50,
+      "unit": "m²"
+    },
+    {
+      "id": "numberOfSides",
+      "question": "Nombre de pans",
+      "type": "single",
+      "required": true,
+      "options": [
+        {
+          "value": "1",
+          "label": "1 pan",
+          "icon": "📐"
+        },
+        {
+          "value": "2",
+          "label": "2 pans",
+          "icon": "📏"
+        },
+        {
+          "value": "4",
+          "label": "4 pans",
+          "icon": "🔲"
+        },
+        {
+          "value": "plus",
+          "label": "Plus de 4",
+          "icon": "🔳"
+        }
+      ]
+    },
+    {
+      "id": "accessibility",
+      "question": "Accessibilité",
+      "type": "single",
+      "required": true,
+      "options": [
+        {
+          "value": "plain_pied",
+          "label": "Plain-pied",
+          "icon": "🏡"
+        },
+        {
+          "value": "1_etage",
+          "label": "1 étage",
+          "icon": "🏢"
+        },
+        {
+          "value": "2_etages",
+          "label": "2 étages",
+          "icon": "🏗️"
+        },
+        {
+          "value": "plus",
+          "label": "Plus",
+          "icon": "🏛️"
+        }
+      ]
+    },
+    {
+      "id": "options",
+      "question": "Options supplémentaires",
+      "type": "multiselect",
+      "required": false,
+      "options": [
+        {
+          "value": "velux",
+          "label": "Velux",
+          "icon": "🪟",
+          "hasQuantity": true,
+          "quantityLabel": "Nombre de Velux"
+        },
+        {
+          "value": "gouttiere",
+          "label": "Gouttières",
+          "icon": "💧"
+        },
+        {
+          "value": "isolation",
+          "label": "Isolation",
+          "icon": "🔥"
+        },
+        {
+          "value": "depose",
+          "label": "Dépose ancienne toiture",
+          "icon": "🗑️"
+        },
+        {
+          "value": "charpente",
+          "label": "Traitement charpente",
+          "icon": "🪵"
+        }
+      ]
+    },
+    {
+      "id": "postalCode",
+      "question": "Code postal",
+      "type": "text",
+      "required": true,
+      "inputType": "text",
+      "pattern": "^[0-9]{5}$",
+      "maxLength": 5,
+      "placeholder": "75001"
+    }
+  ],
+  "result": {
+    "title": "Votre estimation",
+    "showBreakdown": true,
+    "showDaysEstimate": true,
+    "leadForm": {
+      "title": "Recevoir mon estimation détaillée",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Nom complet",
+          "type": "text",
+          "required": true,
+          "placeholder": "Jean Dupont"
+        },
+        {
+          "id": "phone",
+          "label": "Téléphone",
+          "type": "tel",
+          "required": true,
+          "placeholder": "06 12 34 56 78"
+        },
+        {
+          "id": "email",
+          "label": "Email",
+          "type": "email",
+          "required": true,
+          "placeholder": "jean@exemple.com"
+        }
+      ],
+      "submitButton": "Recevoir mon estimation détaillée",
+      "successMessage": "Merci ! Votre demande d'estimation a bien été envoyée. Un expert vous contactera dans les plus brefs délais."
+    }
+  },
+  "translations": {
+    "fr": {
+      "nextButton": "Suivant",
+      "prevButton": "Précédent",
+      "submitButton": "Voir mon estimation",
+      "calculating": "Calcul en cours...",
+      "errorMessage": "Une erreur est survenue. Veuillez réessayer."
+    }
+  },
+  "styling": {
+    "theme": "modern",
+    "borderRadius": "24px",
+    "animation": "fade",
+    "progressBar": true,
+    "stepCounter": true
+  },
+  "calculationRules": {
+    "baseFormula": "(pricing[material] * surface) + optionsCost",
+    "multipliers": {
+      "numberOfSides": {
+        "1": 1.0,
+        "2": 1.2,
+        "4": 1.5,
+        "plus": 1.8
+      },
+      "accessibility": {
+        "plain_pied": 1.0,
+        "1_etage": 1.15,
+        "2_etages": 1.3,
+        "plus": 1.5
+      },
+      "projectType": {
+        "renovation": 1.0,
+        "repair": 0.6,
+        "cleaning": 0.3,
+        "insulation": 0.8
+      }
+    },
+    "daysFormula": "surface / 20 * projectFactor + optionsFactor"
+  }
+}
