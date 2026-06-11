@@ -12,7 +12,7 @@
       { value: 'refection_complete', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
       { value: 'reparation', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
       { value: 'demoussage', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
-      { value: 'isolation', label: 'Isolation de toiture', icon: '🔥', desc: 'Isolation thermique' },
+      { value: 'isolation', label: 'Isolation toiture', icon: '🔥', desc: 'Isolation thermique' },
       { value: 'recherche_fuite', label: 'Recherche de fuite', icon: '💧', desc: 'Détection et réparation' }
     ] },
     { id: 'buildingType', question: 'Quel type de bâtiment ?', type: 'options', options: [
@@ -76,11 +76,11 @@
   ];
 
   const delayOptions = [
-    { value: 'urgent', label: 'Urgent (moins d\'une semaine)', icon: '🚨' },
+    { value: 'urgent', label: 'Urgent', icon: '🚨' },
     { value: 'moins_3', label: 'Moins de 3 mois', icon: '📅' },
     { value: 'moins_6', label: 'Moins de 6 mois', icon: '📆' },
     { value: 'plus_6', label: 'Plus de 6 mois', icon: '🗓️' },
-    { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
+    { value: 'compare', label: 'Je compare', icon: '🔍' }
   ];
 
   const labels = {
@@ -166,8 +166,7 @@
   }
 
   function renderDelay(container) {
-    const progress = 100;
-    let html = `<div class="widget-progress"><div class="widget-progress-fill" style="width: ${progress}%;"></div></div>
+    let html = `<div class="widget-progress"><div class="widget-progress-fill" style="width: 100%;"></div></div>
       <div class="widget-step-counter">${questions.length + 1} / ${TOTAL_STEPS}</div>
       <div class="widget-content"><div class="widget-step"><h2 class="widget-question">Quel est votre délai ?</h2>
       <div class="widget-options">`;
@@ -193,17 +192,17 @@
 
   function renderRecap(container) {
     const recapItems = [
-      { label: 'Type de projet', value: labels.projectType[answers.projectType] },
-      { label: 'Type de bâtiment', value: labels.buildingType[answers.buildingType] },
+      { label: 'Projet', value: labels.projectType[answers.projectType] },
+      { label: 'Bâtiment', value: labels.buildingType[answers.buildingType] },
       { label: 'Surface', value: `${answers.surface} m²` },
       { label: 'Matériau', value: labels.material[answers.material] },
-      { label: 'Âge de la toiture', value: labels.age[answers.age] },
-      { label: 'État général', value: labels.state[answers.state] },
-      { label: 'Nombre de pans', value: labels.sides[answers.sides] },
+      { label: 'Âge', value: labels.age[answers.age] },
+      { label: 'État', value: labels.state[answers.state] },
+      { label: 'Pans', value: labels.sides[answers.sides] },
       { label: 'Pente', value: labels.pente[answers.pente] },
       { label: 'Accessibilité', value: labels.accessibility[answers.accessibility] },
-      { label: 'Dépose ancienne', value: labels.depose[answers.depose] },
-      { label: 'Délai souhaité', value: labels.delay[answers.delay] },
+      { label: 'Dépose', value: labels.depose[answers.depose] },
+      { label: 'Délai', value: labels.delay[answers.delay] },
       { label: 'Code postal', value: answers.postalCode }
     ];
     let optionsList = [];
@@ -211,35 +210,33 @@
       if (answers.options.velux) optionsList.push(`Velux (${answers.options.veluxCount || 1}x)`);
       if (answers.options.gouttiere) optionsList.push('Gouttières');
       if (answers.options.isolation) optionsList.push('Isolation');
-      if (answers.options.charpente) optionsList.push('Traitement charpente');
-      if (answers.options.ecran) optionsList.push('Écran sous toiture');
+      if (answers.options.charpente) optionsList.push('Charpente');
+      if (answers.options.ecran) optionsList.push('Écran');
     }
     if (optionsList.length) recapItems.push({ label: 'Options', value: optionsList.join(', ') });
-    let recapHtml = '<div style="background: #f8fafc; border-radius: 20px; padding: 24px; margin: 20px 0;"><h3 style="margin-bottom: 16px;">📋 Récapitulatif</h3><div style="display: flex; flex-direction: column; gap: 12px;">';
+    let recapHtml = '<div style="background:#f8fafc;border-radius:20px;padding:24px;margin:20px 0;"><h3 style="margin-bottom:16px;">📋 Récapitulatif</h3><div style="display:flex;flex-direction:column;gap:12px;">';
     recapItems.forEach(item => {
-      recapHtml += `<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
-        <span style="color: #64748b;">${item.label}</span><span style="font-weight: 500;">${item.value}</span></div>`;
+      recapHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;"><span style="color:#64748b;">${item.label}</span><span style="font-weight:500;">${item.value}</span></div>`;
     });
     recapHtml += '</div></div>';
-    const html = `<div class="widget-content"><div class="widget-step"><h2 class="widget-question">Vérifiez vos informations</h2>
-      <p style="color: #64748b; margin-bottom: 20px;">Confirmez vos réponses avant de recevoir votre estimation.</p>
+    const html = `<div class="widget-content"><div class="widget-step"><h2 class="widget-question">Vos informations</h2>
       ${recapHtml}
-      <div style="margin-top: 24px; text-align: left;">
-        <div class="widget-form-group"><label>Nom complet</label><input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont"></div>
+      <div style="margin-top:24px;">
+        <div class="widget-form-group"><label>Nom</label><input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont"></div>
         <div class="widget-form-group"><label>Téléphone</label><input type="tel" id="lead-phone" class="widget-input" placeholder="06 12 34 56 78"></div>
         <div class="widget-form-group"><label>Email</label><input type="email" id="lead-email" class="widget-input" placeholder="contact@exemple.fr"></div>
       </div>
       <div class="widget-navigation"><button class="widget-btn widget-btn-prev" onclick="window.prevStep()">← Modifier</button>
-      <button class="widget-btn widget-btn-submit" onclick="window.submitLead()">Recevoir mon estimation →</button></div></div></div>`;
+      <button class="widget-btn widget-btn-submit" onclick="window.submitLead()">Recevoir l'estimation →</button></div></div></div>`;
     container.innerHTML = html;
   }
 
   function renderSuccess(container) {
-    container.innerHTML = `<div class="widget-content"><div class="widget-step" style="text-align: center;">
-      <div style="font-size: 64px; margin-bottom: 24px;">✅</div>
+    container.innerHTML = `<div class="widget-content"><div class="widget-step" style="text-align:center;">
+      <div style="font-size:64px;margin-bottom:24px;">✅</div>
       <h2 class="widget-question">Merci !</h2>
-      <p style="color: #64748b;">Votre demande a bien été envoyée.<br>Un artisan vous contactera rapidement.</p>
-      <button class="widget-btn widget-btn-next" onclick="location.reload()" style="margin-top: 24px;">Nouvelle estimation →</button></div></div>`;
+      <p>Votre demande a bien été envoyée.<br>Un artisan vous contactera rapidement.</p>
+      <button class="widget-btn widget-btn-next" onclick="location.reload()" style="margin-top:24px;">Nouvelle estimation →</button></div></div>`;
   }
 
   window.showRecap = () => { currentStep = questions.length + 2; render(); };
@@ -265,15 +262,15 @@
   window.calculateQuote = async () => {
     if (!answers.delay) { alert('Veuillez sélectionner un délai'); return; }
     const required = ['projectType', 'buildingType', 'surface', 'material', 'age', 'state', 'sides', 'pente', 'accessibility', 'depose', 'postalCode'];
-    if (required.some(r => !answers[r])) { alert('Veuillez répondre à toutes les questions'); return; }
+    for (let r of required) if (!answers[r]) { alert('Veuillez répondre à toutes les questions'); return; }
     const container = document.getElementById('widget-content');
-    if (container) container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calcul en cours...</div>';
+    if (container) container.innerHTML = '<div style="text-align:center;padding:40px;">⏳ Calcul en cours...</div>';
     try {
       const response = await fetch(`${API_BASE}/api/calculate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ license: LICENSE_KEY, answers }) });
       quoteResult = await response.json();
       currentStep = questions.length + 1;
       render();
-    } catch (error) { alert('Erreur lors du calcul: ' + error.message); }
+    } catch (error) { alert('Erreur: ' + error.message); }
   };
   window.submitLead = async () => {
     const name = document.getElementById('lead-name')?.value;
