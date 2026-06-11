@@ -2,8 +2,7 @@
   "name": "roof-widget",
   "version": "1.0.0",
   "scripts": {
-    "build": "node build.js",
-    "deploy": "npm run build && vercel --prod"
+    "build": "node build.js"
   },
   "devDependencies": {
     "javascript-obfuscator": "^4.1.0"
