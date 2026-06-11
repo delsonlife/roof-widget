@@ -5,7 +5,6 @@
   let answers = { surface: 80 };
   let quoteResult = null;
 
-  // Nombre total d'étapes (12 questions + 1 délai = 13)
   const TOTAL_STEPS = 13;
 
   const questions = [
@@ -84,6 +83,20 @@
     { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
   ];
 
+  // Labels pour l'affichage des réponses
+  const labels = {
+    projectType: { refection_complete: 'Réfection complète', reparation: 'Réparation', demoussage: 'Démoussage', isolation: 'Isolation', recherche_fuite: 'Recherche de fuite' },
+    buildingType: { maison: 'Maison individuelle', garage: 'Garage', dependance: 'Dépendance', immeuble: 'Immeuble', local_pro: 'Local professionnel' },
+    material: { tuile: 'Tuile', ardoise: 'Ardoise', zinc: 'Zinc', bac_acier: 'Bac acier' },
+    age: { moins_10: 'Moins de 10 ans', '10_20': '10 à 20 ans', '20_30': '20 à 30 ans', plus_30: 'Plus de 30 ans', je_ne_sais_pas: 'Je ne sais pas' },
+    state: { bon: 'Bon état', moyen: 'État moyen', degrade: 'Dégradée', tres_degrade: 'Très dégradée' },
+    sides: { '1': '1 pan', '2': '2 pans', '4': '4 pans', plus: 'Plus de 4 pans' },
+    pente: { faible: 'Faible', moyenne: 'Moyenne', forte: 'Forte', tres_forte: 'Très forte' },
+    accessibility: { plain_pied: 'Plain-pied', '1_etage': '1 étage', '2_etages': '2 étages', '3_etages_plus': '3 étages ou plus' },
+    depose: { oui: 'Oui', non: 'Non', je_ne_sais_pas: 'Je ne sais pas' },
+    delay: { urgent: 'Urgent', moins_3: 'Moins de 3 mois', moins_6: 'Moins de 6 mois', plus_6: 'Plus de 6 mois', compare: 'Je compare' }
+  };
+
   function init() {
     render();
   }
@@ -98,12 +111,6 @@
       target.appendChild(container);
     }
 
-    // Logique des étapes:
-    // currentStep 0 à 11 = questions (12 questions)
-    // currentStep 12 = écran délai (13ème étape)
-    // currentStep 13 = résultat
-    // currentStep 14 = succès
-
     if (currentStep < questions.length) {
       renderQuestion(container);
     } else if (currentStep === questions.length) {
@@ -111,13 +118,14 @@
     } else if (currentStep === questions.length + 1 && quoteResult) {
       renderResult(container);
     } else if (currentStep === questions.length + 2) {
+      renderRecap(container);
+    } else if (currentStep === questions.length + 3) {
       renderSuccess(container);
     }
   }
 
   function renderQuestion(container) {
     const q = questions[currentStep];
-    // Progression: currentStep+1 sur TOTAL_STEPS (13)
     const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
     
     let html = `
@@ -208,7 +216,6 @@
   }
 
   function renderDelay(container) {
-    // Étape 13/13
     const progress = 100;
     
     let html = `
@@ -256,7 +263,70 @@
           </div>
           <div class="widget-result-days">⏱️ Durée estimée : ${quoteResult.daysEstimate.min} à ${quoteResult.daysEstimate.max} jours</div>
           
-          <div style="margin-top: 32px; text-align: left;">
+          <div class="widget-navigation" style="margin-top: 32px;">
+            <button class="widget-btn widget-btn-prev" onclick="window.prevStep()">← Modifier</button>
+            <button class="widget-btn widget-btn-next" onclick="window.showRecap()">Continuer →</button>
+          </div>
+        </div>
+      </div>
+    `;
+    container.innerHTML = html;
+  }
+
+  function renderRecap(container) {
+    // Construction du récapitulatif
+    const recapItems = [
+      { label: 'Type de projet', value: labels.projectType[answers.projectType] },
+      { label: 'Type de bâtiment', value: labels.buildingType[answers.buildingType] },
+      { label: 'Surface', value: `${answers.surface} m²` },
+      { label: 'Matériau', value: labels.material[answers.material] },
+      { label: 'Âge de la toiture', value: labels.age[answers.age] },
+      { label: 'État général', value: labels.state[answers.state] },
+      { label: 'Nombre de pans', value: labels.sides[answers.sides] },
+      { label: 'Pente', value: labels.pente[answers.pente] },
+      { label: 'Accessibilité', value: labels.accessibility[answers.accessibility] },
+      { label: 'Dépose ancienne', value: labels.depose[answers.depose] },
+      { label: 'Délai souhaité', value: labels.delay[answers.delay] },
+      { label: 'Code postal', value: answers.postalCode }
+    ];
+    
+    // Ajouter les options sélectionnées
+    let optionsList = [];
+    if (answers.options) {
+      if (answers.options.velux) optionsList.push(`Velux (${answers.options.veluxCount || 1}x)`);
+      if (answers.options.gouttiere) optionsList.push('Gouttières');
+      if (answers.options.isolation) optionsList.push('Isolation');
+      if (answers.options.charpente) optionsList.push('Traitement charpente');
+      if (answers.options.ecran) optionsList.push('Écran sous toiture');
+    }
+    if (optionsList.length > 0) {
+      recapItems.push({ label: 'Options', value: optionsList.join(', ') });
+    }
+    
+    let recapHtml = '<div style="background: #f8fafc; border-radius: 20px; padding: 24px; margin: 20px 0;">';
+    recapHtml += '<h3 style="margin-bottom: 16px; color: #1a1a2e;">📋 Récapitulatif de vos réponses</h3>';
+    recapHtml += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+    
+    recapItems.forEach(item => {
+      recapHtml += `
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+          <span style="color: #64748b;">${item.label}</span>
+          <span style="font-weight: 500; color: #1a1a2e;">${item.value}</span>
+        </div>
+      `;
+    });
+    
+    recapHtml += '</div></div>';
+    
+    const html = `
+      <div class="widget-content">
+        <div class="widget-step">
+          <h2 class="widget-question">Vérifiez vos informations</h2>
+          <p style="color: #64748b; margin-bottom: 20px;">Confirmez vos réponses avant de recevoir votre estimation détaillée.</p>
+          
+          ${recapHtml}
+          
+          <div style="margin-top: 24px; text-align: left;">
             <div class="widget-form-group">
               <label>Nom complet</label>
               <input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont">
@@ -293,6 +363,11 @@
       </div>
     `;
   }
+
+  window.showRecap = () => {
+    currentStep = questions.length + 2;
+    render();
+  };
 
   window.selectOption = (id, value) => {
     answers[id] = value;
@@ -336,12 +411,10 @@
       return;
     }
     
-    // Passer à l'étape suivante
     if (currentStep < questions.length - 1) {
       currentStep++;
       render();
     } else {
-      // Dernière question (12/13), aller à l'écran délai (13/13)
       currentStep = questions.length;
       render();
     }
@@ -349,12 +422,13 @@
 
   window.prevStep = () => {
     if (currentStep === questions.length) {
-      // Revenir à la dernière question
       currentStep = questions.length - 1;
       render();
     } else if (currentStep === questions.length + 1) {
-      // Revenir à l'écran délai
       currentStep = questions.length;
+      render();
+    } else if (currentStep === questions.length + 2) {
+      currentStep = questions.length + 1;
       render();
     } else if (currentStep > 0) {
       currentStep--;
@@ -363,7 +437,6 @@
   };
 
   window.calculateQuote = async () => {
-    // Vérifier que le délai a été sélectionné
     if (!answers.delay) {
       alert('Veuillez sélectionner un délai');
       return;
@@ -418,7 +491,7 @@
         })
       });
       
-      currentStep = questions.length + 2;
+      currentStep = questions.length + 3;
       render();
     } catch (error) {
       alert('Erreur lors de l\'envoi');
