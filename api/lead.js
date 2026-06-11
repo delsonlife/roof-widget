@@ -1,42 +1,43 @@
 import fs from 'fs';
 import path from 'path';
 
+const LICENSES = {
+  DMP2024: {
+    domain: 'd-m-nageur1.vercel.app',
+    allowedOrigins: ['https://d-m-nageur1.vercel.app']
+  }
+};
+
 export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
   const { license, leadData, quoteData } = req.body;
   
-  if (!license || !leadData || !quoteData) {
-    return res.status(400).json({ error: 'License, lead data and quote data required' });
+  if (!license) {
+    return res.status(401).json({ error: 'License key required' });
   }
   
+  const licenseData = LICENSES[license];
+  if (!licenseData) {
+    return res.status(403).json({ error: 'Invalid license key' });
+  }
+  
+  const origin = req.headers.origin;
+  if (!licenseData.allowedOrigins.includes(origin)) {
+    return res.status(403).json({ error: 'Origin not authorized' });
+  }
+  
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
   try {
-    const licensesPath = path.join(process.cwd(), 'data', 'licenses.json');
-    const licensesData = JSON.parse(fs.readFileSync(licensesPath, 'utf8'));
-    
-    const licenseData = licensesData[license];
-    
-    if (!licenseData || !licenseData.active) {
-      return res.status(401).json({ error: 'Invalid or inactive license' });
-    }
-    
-    const lead = {
-      id: generateLeadId(),
-      license,
-      company: licenseData.branding.companyName,
-      timestamp: new Date().toISOString(),
-      lead: {
-        name: leadData.name,
-        email: leadData.email,
-        phone: leadData.phone,
-        postalCode: leadData.postalCode
-      },
-      project: leadData.projectData,
-      quote: quoteData
-    };
-    
     const leadsPath = path.join(process.cwd(), 'data', 'leads.json');
     let leads = [];
     
@@ -44,49 +45,23 @@ export default async function handler(req, res) {
       leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
     }
     
+    const lead = {
+      id: 'lead_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      license,
+      timestamp: new Date().toISOString(),
+      lead: leadData,
+      quote: quoteData
+    };
+    
     leads.push(lead);
     fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
     
-    await sendEmailNotification(lead, licenseData);
+    // Ici vous pouvez ajouter l'envoi d'email (Brevo, Resend, etc.)
     
-    return res.status(200).json({ 
-      success: true, 
-      leadId: lead.id,
-      message: 'Lead captured successfully'
-    });
+    return res.status(200).json({ success: true, leadId: lead.id });
     
   } catch (error) {
     console.error('Lead capture error:', error);
     return res.status(500).json({ error: 'Failed to capture lead' });
   }
-}
-
-function generateLeadId() {
-  return 'lead_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-async function sendEmailNotification(lead, licenseData) {
-  const emailContent = `
-    Nouveau lead de devis toiture
-    
-    Client: ${lead.lead.name}
-    Email: ${lead.lead.email}
-    Téléphone: ${lead.lead.phone}
-    Code postal: ${lead.lead.postalCode}
-    
-    Détails du projet:
-    Type: ${lead.project.projectType}
-    Matériau: ${lead.project.material}
-    Surface: ${lead.project.surface} m²
-    Pans: ${lead.project.numberOfSides}
-    
-    Estimation: ${lead.quote.lowEstimate}€ - ${lead.quote.highEstimate}€
-    Délai: ${lead.quote.daysEstimate.min} - ${lead.quote.daysEstimate.max} jours
-    
-    Date: ${lead.timestamp}
-  `;
-  
-  console.log('Email notification would be sent:', emailContent);
-  
-  return true;
 }
