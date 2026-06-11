@@ -1,11 +1,11 @@
 (function() {
-  let config = null;
   let currentStep = 0;
   let userResponses = {};
   let quoteResult = null;
   
-  // LICENCE FORCÉE POUR COUVERTURE PARIS PRO
-  const FORCED_LICENSE = 'DMP2024';
+  // Configuration
+  const LICENSE_KEY = 'DMP2024';
+  const API_BASE = window.location.origin;
   
   const steps = [
     { id: 'projectType', title: 'Type de projet', type: 'options' },
@@ -13,22 +13,22 @@
     { id: 'surface', title: 'Surface du toit', type: 'slider' },
     { id: 'sides', title: 'Nombre de pans', type: 'options' },
     { id: 'accessibility', title: 'Accessibilité', type: 'options' },
-    { id: 'options', title: 'Options supplémentaires', type: 'multiselect' },
+    { id: 'options', title: 'Options', type: 'multiselect' },
     { id: 'postalCode', title: 'Code postal', type: 'input' }
   ];
   
   const projectTypes = [
-    { value: 'renovation', label: 'Réfection complète', icon: '🏠', description: 'Toiture entière à refaire' },
-    { value: 'repair', label: 'Réparation', icon: '🔧', description: 'Réparation localisée' },
-    { value: 'cleaning', label: 'Démoussage', icon: '🧹', description: 'Nettoyage et traitement' },
-    { value: 'insulation', label: 'Isolation toiture', icon: '🔥', description: 'Isolation thermique' }
+    { value: 'renovation', label: 'Réfection complète', icon: '🏠', desc: 'Toiture entière à refaire' },
+    { value: 'repair', label: 'Réparation', icon: '🔧', desc: 'Réparation localisée' },
+    { value: 'cleaning', label: 'Démoussage', icon: '🧹', desc: 'Nettoyage et traitement' },
+    { value: 'insulation', label: 'Isolation', icon: '🔥', desc: 'Isolation thermique' }
   ];
   
   const materials = [
-    { value: 'tuile', label: 'Tuile', icon: '🏺', price: 95 },
-    { value: 'ardoise', label: 'Ardoise', icon: '🪨', price: 145 },
-    { value: 'zinc', label: 'Zinc', icon: '⚙️', price: 180 },
-    { value: 'bac_acier', label: 'Bac acier', icon: '🔩', price: 110 }
+    { value: 'tuile', label: 'Tuile', icon: '🏺' },
+    { value: 'ardoise', label: 'Ardoise', icon: '🪨' },
+    { value: 'zinc', label: 'Zinc', icon: '⚙️' },
+    { value: 'bac_acier', label: 'Bac acier', icon: '🔩' }
   ];
   
   const sidesOptions = [
@@ -46,376 +46,212 @@
   ];
   
   const additionalOptions = [
-    { value: 'velux', label: 'Velux', icon: '🪟', price: 1200 },
-    { value: 'gouttiere', label: 'Gouttières', icon: '💧', price: 35 },
-    { value: 'isolation', label: 'Isolation', icon: '🔥', price: 45 },
-    { value: 'depose', label: 'Dépose ancienne toiture', icon: '🗑️', price: 25 },
-    { value: 'charpente', label: 'Traitement charpente', icon: '🪵', price: 65 }
+    { value: 'velux', label: 'Velux', icon: '🪟' },
+    { value: 'gouttiere', label: 'Gouttières', icon: '💧' },
+    { value: 'isolation', label: 'Isolation', icon: '🔥' },
+    { value: 'depose', label: 'Dépose toiture', icon: '🗑️' },
+    { value: 'charpente', label: 'Traitement charpente', icon: '🪵' }
   ];
   
-  async function initWidget() {
-    try {
-      // Utiliser la licence forcée ou celle de l'URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const licenseKey = FORCED_LICENSE || urlParams.get('license') || getLicenseFromScript();
-      
-      if (!licenseKey) {
-        console.error('No license key provided');
-        return;
-      }
-      
-      console.log('Licence utilisée:', licenseKey);
-      
-      const domain = window.location.hostname;
-      const response = await fetch(`/api/license?license=${licenseKey}&domain=${domain}`);
-      const data = await response.json();
-      
-      if (!data.valid) {
-        console.error('Invalid license');
-        return;
-      }
-      
-      config = data;
-      applyBranding(config.branding);
-      renderWidget();
-      
-    } catch (error) {
-      console.error('Widget initialization failed:', error);
-    }
-  }
-  
-  function getLicenseFromScript() {
-    const scripts = document.getElementsByTagName('script');
-    for (let script of scripts) {
-      const src = script.src;
-      if (src && src.includes('widget.js')) {
-        const urlParams = new URLSearchParams(src.split('?')[1]);
-        return urlParams.get('license');
-      }
-    }
-    return null;
-  }
-  
-  function applyBranding(branding) {
-    document.documentElement.style.setProperty('--widget-primary', branding.primaryColor);
-    document.documentElement.style.setProperty('--widget-secondary', branding.secondaryColor);
-    
-    if (branding.logo) {
-      const logo = branding.logo;
-    }
-  }
-  
-  function renderWidget() {
-    const container = document.createElement('div');
-    container.className = 'widget-container';
-    container.id = 'roof-widget';
-    
-    const progressBar = document.createElement('div');
-    progressBar.className = 'widget-progress';
-    progressBar.style.width = `${((currentStep + 1) / steps.length) * 100}%`;
-    
-    const content = document.createElement('div');
-    content.className = 'widget-content';
-    content.id = 'widget-content';
-    
-    container.appendChild(progressBar);
-    container.appendChild(content);
-    
-    const existingWidget = document.getElementById('roof-widget');
-    if (existingWidget) {
-      existingWidget.replaceWith(container);
-    } else {
+  function render() {
+    let container = document.getElementById('roof-widget-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'roof-widget-container';
+      container.style.cssText = 'position: fixed; bottom: 100px; right: 20px; width: 420px; max-width: calc(100vw - 40px); z-index: 10000;';
       document.body.appendChild(container);
     }
     
-    renderCurrentStep();
+    container.innerHTML = `
+      <div style="background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+        <div style="height: 4px; background: linear-gradient(90deg, #ff6b00, #ff8533); width: ${((currentStep + 1) / steps.length) * 100}%;"></div>
+        <div id="widget-content" style="padding: 24px; max-height: 70vh; overflow-y: auto;"></div>
+      </div>
+    `;
+    
+    renderStep();
   }
   
-  async function renderCurrentStep() {
+  function renderStep() {
     const content = document.getElementById('widget-content');
     if (!content) return;
     
     const step = steps[currentStep];
     
     let html = `
-      <div class="widget-step">
-        <h2 class="widget-title">${step.title}</h2>
-        <p class="widget-subtitle">Étape ${currentStep + 1} sur ${steps.length}</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 20px;">${step.title}</h2>
+        <button onclick="document.getElementById('roof-widget-container').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✕</button>
+      </div>
+      <p style="color: #666; margin-bottom: 24px;">Étape ${currentStep + 1} / ${steps.length}</p>
     `;
     
-    switch (step.type) {
-      case 'options':
-        html += renderOptionsStep(step.id);
-        break;
-      case 'slider':
-        html += renderSliderStep();
-        break;
-      case 'multiselect':
-        html += renderMultiselectStep();
-        break;
-      case 'input':
-        html += renderInputStep();
-        break;
+    if (step.type === 'options') {
+      let options = [];
+      if (step.id === 'projectType') options = projectTypes;
+      if (step.id === 'material') options = materials;
+      if (step.id === 'sides') options = sidesOptions;
+      if (step.id === 'accessibility') options = accessibilityOptions;
+      
+      html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+      options.forEach(opt => {
+        const isSelected = userResponses[step.id] === opt.value;
+        html += `
+          <div onclick="window.selectOption('${step.id}', '${opt.value}')" style="padding: 16px; border: 2px solid ${isSelected ? '#ff6b00' : '#e5e7eb'}; border-radius: 12px; cursor: pointer; background: ${isSelected ? '#fff7ed' : 'white'}; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">${opt.icon}</span>
+            <div><div style="font-weight: 600;">${opt.label}</div>${opt.desc ? `<div style="font-size: 12px; color: #666;">${opt.desc}</div>` : ''}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+    
+    if (step.type === 'slider') {
+      const surface = userResponses.surface || 50;
+      html += `
+        <div>
+          <input type="range" id="surface-slider" min="20" max="300" value="${surface}" step="5" style="width: 100%; margin: 20px 0; height: 6px; -webkit-appearance: none; background: #e5e7eb; border-radius: 3px;">
+          <div style="text-align: center; font-size: 28px; font-weight: 700; color: #ff6b00;"><span id="surface-value">${surface}</span> m²</div>
+        </div>
+      `;
+    }
+    
+    if (step.type === 'multiselect') {
+      const selected = userResponses.options || {};
+      html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+      additionalOptions.forEach(opt => {
+        const isSelected = selected[opt.value];
+        html += `
+          <div onclick="window.toggleOption('${opt.value}')" style="padding: 16px; border: 2px solid ${isSelected ? '#ff6b00' : '#e5e7eb'}; border-radius: 12px; cursor: pointer; background: ${isSelected ? '#fff7ed' : 'white'}; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">${opt.icon}</span>
+            <div><div style="font-weight: 600;">${opt.label}</div></div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+    
+    if (step.type === 'input') {
+      html += `
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Code postal</label>
+          <input type="text" id="postal-input" style="width: 100%; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 16px;" placeholder="75001" value="${userResponses.postalCode || ''}" maxlength="5">
+        </div>
+      `;
     }
     
     html += `
-        <div class="widget-actions">
-          ${currentStep > 0 ? '<button class="widget-button widget-button-secondary" onclick="window.widgetPrevStep()">Précédent</button>' : ''}
-          <button class="widget-button widget-button-primary" onclick="window.widgetNextStep()">${currentStep === steps.length - 1 ? 'Voir mon estimation' : 'Suivant'}</button>
-        </div>
+      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 32px;">
+        ${currentStep > 0 ? '<button onclick="window.prevStep()" style="padding: 12px 20px; background: #f3f4f6; border: none; border-radius: 12px; cursor: pointer; font-weight: 500;">Précédent</button>' : '<div></div>'}
+        <button onclick="window.nextStep()" style="padding: 12px 28px; background: #ff6b00; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 500;">${currentStep === steps.length - 1 ? 'Voir estimation' : 'Suivant'}</button>
       </div>
     `;
     
     content.innerHTML = html;
     
     if (step.type === 'slider') {
-      setupSlider();
+      const slider = document.getElementById('surface-slider');
+      const display = document.getElementById('surface-value');
+      if (slider) {
+        slider.addEventListener('input', (e) => {
+          display.textContent = e.target.value;
+          userResponses.surface = parseInt(e.target.value);
+        });
+      }
     }
   }
   
-  function renderOptionsStep(stepId) {
-    let options = [];
-    switch (stepId) {
-      case 'projectType':
-        options = projectTypes;
-        break;
-      case 'material':
-        options = materials;
-        break;
-      case 'sides':
-        options = sidesOptions;
-        break;
-      case 'accessibility':
-        options = accessibilityOptions;
-        break;
-    }
-    
-    let html = '<div class="widget-options">';
-    options.forEach(option => {
-      const isSelected = userResponses[stepId] === option.value;
-      html += `
-        <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetSelectOption('${stepId}', '${option.value}')">
-          <div class="widget-option-icon">${option.icon}</div>
-          <div class="widget-option-text">
-            <div class="widget-option-title">${option.label}</div>
-            ${option.description ? `<div class="widget-option-description">${option.description}</div>` : ''}
-          </div>
-        </div>
-      `;
-    });
-    html += '</div>';
-    return html;
-  }
-  
-  function renderSliderStep() {
-    const currentSurface = userResponses.surface || 50;
-    return `
-      <div class="widget-slider">
-        <input type="range" id="surface-slider" min="20" max="300" value="${currentSurface}" step="5">
-        <div class="widget-slider-value">
-          <span id="surface-value">${currentSurface}</span> m²
-        </div>
-      </div>
-    `;
-  }
-  
-  function renderMultiselectStep() {
-    const selectedOptions = userResponses.options || {};
-    let html = '<div class="widget-options">';
-    additionalOptions.forEach(option => {
-      const isSelected = selectedOptions[option.value];
-      html += `
-        <div class="widget-option ${isSelected ? 'selected' : ''}" onclick="window.widgetToggleOption('${option.value}')">
-          <div class="widget-option-icon">${option.icon}</div>
-          <div class="widget-option-text">
-            <div class="widget-option-title">${option.label}</div>
-            <div class="widget-option-description">À partir de ${option.price}€</div>
-          </div>
-        </div>
-      `;
-    });
-    
-    html += `
-      <div class="widget-option" onclick="window.widgetShowVeluxCount()">
-        <div class="widget-option-icon">🪟</div>
-        <div class="widget-option-text">
-          <div class="widget-option-title">Nombre de Velux</div>
-          <div class="widget-option-description">${selectedOptions.veluxCount || 1} Velux</div>
-        </div>
-      </div>
-    `;
-    
-    html += '</div>';
-    return html;
-  }
-  
-  function renderInputStep() {
-    return `
-      <div class="widget-form-group">
-        <label for="postal-code">Code postal</label>
-        <input type="text" id="postal-code" class="widget-input" placeholder="75001" value="${userResponses.postalCode || ''}" maxlength="5">
-      </div>
-    `;
-  }
-  
-  function setupSlider() {
-    const slider = document.getElementById('surface-slider');
-    const valueDisplay = document.getElementById('surface-value');
-    
-    if (slider && valueDisplay) {
-      slider.addEventListener('input', (e) => {
-        valueDisplay.textContent = e.target.value;
-        userResponses.surface = parseInt(e.target.value);
-      });
-    }
-  }
-  
-  function selectOption(stepId, value) {
+  window.selectOption = (stepId, value) => {
     userResponses[stepId] = value;
-    renderCurrentStep();
-  }
+    renderStep();
+  };
   
-  function toggleOption(optionValue) {
+  window.toggleOption = (value) => {
     if (!userResponses.options) userResponses.options = {};
-    userResponses.options[optionValue] = !userResponses.options[optionValue];
-    renderCurrentStep();
-  }
+    userResponses.options[value] = !userResponses.options[value];
+    renderStep();
+  };
   
-  function showVeluxCount() {
-    const count = prompt('Nombre de Velux à installer:', userResponses.options?.veluxCount || 1);
-    if (count && !isNaN(count)) {
-      if (!userResponses.options) userResponses.options = {};
-      userResponses.options.velux = true;
-      userResponses.options.veluxCount = parseInt(count);
-      renderCurrentStep();
-    }
-  }
-  
-  async function nextStep() {
+  window.nextStep = async () => {
     const step = steps[currentStep];
     
-    switch (step.id) {
-      case 'projectType':
-        if (!userResponses.projectType) {
-          alert('Veuillez sélectionner un type de projet');
-          return;
-        }
-        break;
-      case 'material':
-        if (!userResponses.material) {
-          alert('Veuillez sélectionner un matériau');
-          return;
-        }
-        break;
-      case 'surface':
-        if (!userResponses.surface) {
-          userResponses.surface = 50;
-        }
-        break;
-      case 'postalCode':
-        const postalCode = document.getElementById('postal-code')?.value;
-        if (!postalCode || postalCode.length !== 5) {
-          alert('Veuillez entrer un code postal valide');
-          return;
-        }
-        userResponses.postalCode = postalCode;
-        break;
+    if (step.id === 'postalCode') {
+      const input = document.getElementById('postal-input');
+      if (!input || !input.value || input.value.length !== 5) {
+        alert('Veuillez entrer un code postal valide (5 chiffres)');
+        return;
+      }
+      userResponses.postalCode = input.value;
     }
     
     if (currentStep < steps.length - 1) {
       currentStep++;
-      renderCurrentStep();
+      renderStep();
     } else {
-      await calculateQuote();
+      await calculate();
     }
-  }
+  };
   
-  function prevStep() {
+  window.prevStep = () => {
     if (currentStep > 0) {
       currentStep--;
-      renderCurrentStep();
+      renderStep();
     }
-  }
+  };
   
-  async function calculateQuote() {
-    const licenseKey = FORCED_LICENSE || getLicenseFromScript();
-    
-    const projectData = {
-      projectType: userResponses.projectType,
-      material: userResponses.material,
-      surface: userResponses.surface,
-      numberOfSides: userResponses.sides,
-      accessibility: userResponses.accessibility,
-      options: userResponses.options || {},
-      postalCode: userResponses.postalCode
-    };
-    
-    try {
-      const response = await fetch('/api/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license: licenseKey, projectData })
-      });
-      
-      quoteResult = await response.json();
-      renderQuoteResult();
-      
-    } catch (error) {
-      console.error('Calculation failed:', error);
-      alert('Erreur lors du calcul. Veuillez réessayer.');
-    }
-  }
-  
-  function renderQuoteResult() {
+  async function calculate() {
     const content = document.getElementById('widget-content');
+    content.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calcul en cours...</div>';
     
-    let optionsHtml = '';
-    if (userResponses.options) {
-      const selectedOptions = Object.keys(userResponses.options).filter(key => userResponses.options[key] === true && key !== 'veluxCount');
-      if (selectedOptions.length > 0) {
-        optionsHtml = `<div style="font-size: 14px; margin-top: 12px;">
-          Options: ${selectedOptions.join(', ')}
-          ${userResponses.options.veluxCount ? ` (${userResponses.options.veluxCount} Velux)` : ''}
-        </div>`;
-      }
+    const surface = userResponses.surface || 50;
+    const material = userResponses.material || 'tuile';
+    
+    const prices = { tuile: 95, ardoise: 145, zinc: 180, bac_acier: 110 };
+    const pricePerM2 = prices[material];
+    
+    let low = pricePerM2 * surface * 0.85;
+    let high = pricePerM2 * surface * 1.15;
+    
+    if (userResponses.postalCode) {
+      const code = userResponses.postalCode.substring(0, 2);
+      const multipliers = { '75': 1.3, '92': 1.25, '93': 1.2, '94': 1.25 };
+      const mult = multipliers[code] || 1.0;
+      low *= mult;
+      high *= mult;
     }
+    
+    const days = Math.max(3, Math.floor(surface / 15));
     
     content.innerHTML = `
-      <div class="widget-step">
-        <h2 class="widget-title">Votre estimation</h2>
-        <div class="widget-quote">
-          <div class="widget-quote-range">Estimation de</div>
-          <div class="widget-quote-amount">${quoteResult.lowEstimate.toLocaleString()}€ - ${quoteResult.highEstimate.toLocaleString()}€</div>
-          <div class="widget-quote-days">
-            ⏱️ Délai estimé: ${quoteResult.daysEstimate.min} à ${quoteResult.daysEstimate.max} jours
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+          <div style="color: #666;">Estimation de vos travaux</div>
+          <div style="font-size: 32px; font-weight: 700; color: #ff6b00; margin: 12px 0;">${Math.round(low).toLocaleString()}€ - ${Math.round(high).toLocaleString()}€</div>
+          <div style="background: white; display: inline-block; padding: 8px 16px; border-radius: 50px; font-size: 14px;">⏱️ Délai: ${days} à ${days+3} jours</div>
+        </div>
+        
+        <div style="text-align: left;">
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Nom complet</label>
+            <input type="text" id="lead-name" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="Jean Dupont">
           </div>
-          ${optionsHtml}
-        </div>
-        
-        <div class="widget-form-group">
-          <label>Nom complet</label>
-          <input type="text" id="lead-name" class="widget-input" placeholder="Jean Dupont">
-        </div>
-        
-        <div class="widget-form-group">
-          <label>Téléphone</label>
-          <input type="tel" id="lead-phone" class="widget-input" placeholder="06 12 34 56 78">
-        </div>
-        
-        <div class="widget-form-group">
-          <label>Email</label>
-          <input type="email" id="lead-email" class="widget-input" placeholder="jean@exemple.fr">
-        </div>
-        
-        <div class="widget-actions">
-          <button class="widget-button widget-button-secondary" onclick="window.widgetPrevStep()">Modifier</button>
-          <button class="widget-button widget-button-primary" onclick="window.widgetSubmitLead()">Recevoir mon estimation détaillée</button>
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Téléphone</label>
+            <input type="tel" id="lead-phone" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="06 12 34 56 78">
+          </div>
+          <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Email</label>
+            <input type="email" id="lead-email" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;" placeholder="contact@exemple.fr">
+          </div>
+          
+          <button onclick="window.submitLead()" style="width: 100%; padding: 14px; background: #ff6b00; color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">Recevoir mon estimation</button>
+          <button onclick="window.prevStep()" style="width: 100%; margin-top: 12px; padding: 12px; background: #f3f4f6; border: none; border-radius: 12px; cursor: pointer;">Modifier</button>
         </div>
       </div>
     `;
   }
   
-  async function submitLead() {
+  window.submitLead = () => {
     const name = document.getElementById('lead-name')?.value;
     const phone = document.getElementById('lead-phone')?.value;
     const email = document.getElementById('lead-email')?.value;
@@ -425,75 +261,21 @@
       return;
     }
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert('Email invalide');
-      return;
-    }
-    
-    const phoneRegex = /^[0-9+\s]{10,}$/;
-    if (!phoneRegex.test(phone)) {
-      alert('Téléphone invalide');
-      return;
-    }
-    
-    const licenseKey = FORCED_LICENSE || getLicenseFromScript();
-    
-    const leadData = {
-      name,
-      phone,
-      email,
-      postalCode: userResponses.postalCode,
-      projectData: {
-        projectType: userResponses.projectType,
-        material: userResponses.material,
-        surface: userResponses.surface,
-        numberOfSides: userResponses.sides,
-        accessibility: userResponses.accessibility,
-        options: userResponses.options
-      }
-    };
-    
-    try {
-      const response = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license: licenseKey, leadData, quoteData: quoteResult })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        const content = document.getElementById('widget-content');
-        content.innerHTML = `
-          <div class="widget-step" style="text-align: center;">
-            <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
-            <h2 class="widget-title">Merci !</h2>
-            <p style="margin: 20px 0; color: #6b7280;">
-              Votre demande d'estimation a bien été envoyée.<br>
-              Un expert vous contactera dans les plus brefs délais.
-            </p>
-            <button class="widget-button widget-button-primary" onclick="window.location.reload()">Nouvelle estimation</button>
-          </div>
-        `;
-      }
-      
-    } catch (error) {
-      console.error('Lead submission failed:', error);
-      alert('Erreur lors de l\'envoi. Veuillez réessayer.');
-    }
-  }
+    const content = document.getElementById('widget-content');
+    content.innerHTML = `
+      <div style="text-align: center; padding: 48px 24px;">
+        <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
+        <h2 style="margin-bottom: 16px;">Merci !</h2>
+        <p style="color: #666;">Votre demande a bien été envoyée.<br>Un expert vous contactera rapidement.</p>
+        <button onclick="document.getElementById('roof-widget-container').remove()" style="margin-top: 24px; padding: 12px 24px; background: #ff6b00; color: white; border: none; border-radius: 12px; cursor: pointer;">Fermer</button>
+      </div>
+    `;
+  };
   
-  window.widgetSelectOption = selectOption;
-  window.widgetToggleOption = toggleOption;
-  window.widgetShowVeluxCount = showVeluxCount;
-  window.widgetNextStep = nextStep;
-  window.widgetPrevStep = prevStep;
-  window.widgetSubmitLead = submitLead;
-  
+  // Démarrage
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initWidget);
+    document.addEventListener('DOMContentLoaded', render);
   } else {
-    initWidget();
+    render();
   }
 })();
