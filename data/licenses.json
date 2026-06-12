@@ -4,7 +4,10 @@
     "domain": "d-m-nageur1.vercel.app",
     "allowedOrigins": [
       "https://d-m-nageur1.vercel.app",
-      "https://www.d-m-nageur1.vercel.app"
+      "https://www.d-m-nageur1.vercel.app",
+      "https://devis-couvreur1.vercel.app",
+      "https://www.devis-couvreur1.vercel.app"
+      
     ],
     "secret": "8hG7xK29mP4qR5tY",
     "emailNotifications": ["client@email.com"],
