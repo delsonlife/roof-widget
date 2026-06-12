@@ -1,9 +1,14 @@
 (function() {
-  const API_BASE = 'https://roof-widget.vercel.app';
-  const LICENSE_KEY = 'DMP2024';
+  // Récupération de la licence depuis l'URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const LICENSE_KEY = urlParams.get('license') || 'ABC123';
+  
+  const API_BASE = 'https://toiture-one.vercel.app';
   let currentStep = 0;
   let answers = { surface: 80 };
   let quoteResult = null;
+  let licenseValid = false;
+  let branding = {};
 
   const TOTAL_STEPS = 13;
 
@@ -83,7 +88,6 @@
     { value: 'compare', label: 'Je compare simplement', icon: '🔍' }
   ];
 
-  // Labels pour l'affichage des réponses
   const labels = {
     projectType: { refection_complete: 'Réfection complète', reparation: 'Réparation', demoussage: 'Démoussage', isolation: 'Isolation', recherche_fuite: 'Recherche de fuite' },
     buildingType: { maison: 'Maison individuelle', garage: 'Garage', dependance: 'Dépendance', immeuble: 'Immeuble', local_pro: 'Local professionnel' },
@@ -97,8 +101,51 @@
     delay: { urgent: 'Urgent', moins_3: 'Moins de 3 mois', moins_6: 'Moins de 6 mois', plus_6: 'Plus de 6 mois', compare: 'Je compare' }
   };
 
-  function init() {
+  async function init() {
+    const isValid = await checkLicense();
+    if (!isValid) {
+      showError('Licence invalide ou domaine non autorisé');
+      return;
+    }
     render();
+  }
+
+  async function checkLicense() {
+    try {
+      const response = await fetch(`${API_BASE}/api/license?license=${LICENSE_KEY}`, {
+        headers: { 'Origin': window.location.origin }
+      });
+      const data = await response.json();
+      if (data.valid) {
+        licenseValid = true;
+        branding = data.branding || {};
+        if (branding.primaryColor) {
+          document.documentElement.style.setProperty('--rw-primary', branding.primaryColor);
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Erreur vérification licence:', error);
+      return false;
+    }
+  }
+
+  function showError(message) {
+    let container = document.getElementById('roof-widget');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'roof-widget';
+      document.body.appendChild(container);
+    }
+    container.innerHTML = `
+      <div style="background: #fee2e2; color: #dc2626; padding: 20px; border-radius: 12px; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+        <h3>Accès non autorisé</h3>
+        <p>${message}</p>
+        <p style="font-size: 12px; margin-top: 12px;">Licence: ${LICENSE_KEY}</p>
+      </div>
+    `;
   }
 
   function render() {
@@ -274,7 +321,6 @@
   }
 
   function renderRecap(container) {
-    // Construction du récapitulatif
     const recapItems = [
       { label: 'Type de projet', value: labels.projectType[answers.projectType] },
       { label: 'Type de bâtiment', value: labels.buildingType[answers.buildingType] },
@@ -290,7 +336,6 @@
       { label: 'Code postal', value: answers.postalCode }
     ];
     
-    // Ajouter les options sélectionnées
     let optionsList = [];
     if (answers.options) {
       if (answers.options.velux) optionsList.push(`Velux (${answers.options.veluxCount || 1}x)`);
@@ -450,7 +495,7 @@
       return;
     }
     
-    const container = document.getElementById('widget-content');
+    const container = document.getElementById('roof-widget');
     if (container) {
       container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calcul en cours...</div>';
     }
@@ -458,9 +503,18 @@
     try {
       const response = await fetch(`${API_BASE}/api/calculate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license: LICENSE_KEY, answers })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify({ 
+          license: LICENSE_KEY, 
+          answers,
+          domain: window.location.hostname 
+        })
       });
+      
+      if (!response.ok) throw new Error('Erreur licence');
       
       quoteResult = await response.json();
       currentStep = questions.length + 1;
@@ -483,9 +537,13 @@
     try {
       await fetch(`${API_BASE}/api/lead`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
         body: JSON.stringify({
           license: LICENSE_KEY,
+          domain: window.location.hostname,
           leadData: { name, phone, email, postalCode: answers.postalCode, projectData: answers },
           quoteData: quoteResult
         })
