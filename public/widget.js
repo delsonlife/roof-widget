@@ -2,7 +2,7 @@
   const urlParams = new URLSearchParams(window.location.search);
   const LICENSE_KEY = urlParams.get('license') || 'DMP2024';
   
-  const API_BASE = 'https://toiture-one.vercel.app';
+  const API_BASE = 'https://roof-widget.vercel.app';
   let currentStep = 0;
   let answers = { surface: 80 };
   let quoteResult = null;
