@@ -2,23 +2,12 @@ import fs from 'fs';
 import path from 'path';
 
 export default async function handler(req, res) {
-  // Headers CORS - uniquement les domaines nécessaires
-  const allowedOrigins = [
-    'https://devis-couvreur1.vercel.app',
-    'https://roof-widget.vercel.app',
-    'http://localhost:3000'
-  ];
-  
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  
+  // Même configuration CORS que calculate.js et lead.js
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Origin');
   
-  // Requête preflight OPTIONS
+  // Gérer preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -54,6 +43,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'License is inactive' });
     }
     
+    // Vérification du domaine
     const allowedDomains = licenseData.allowedOrigins || [licenseData.domain];
     const isDomainAllowed = allowedDomains.some(allowed => {
       const allowedClean = allowed.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -63,7 +53,7 @@ export default async function handler(req, res) {
     if (!isDomainAllowed) {
       console.log(`❌ Domaine bloqué: ${domain}`);
       return res.status(403).json({ 
-        error: 'Domain not authorized',
+        error: 'Domain not authorized for this license',
         yourDomain: domain,
         allowedDomains: allowedDomains
       });
