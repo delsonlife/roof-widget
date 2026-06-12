@@ -2,21 +2,40 @@ import fs from 'fs';
 import path from 'path';
 
 export default async function handler(req, res) {
+  // Headers CORS - uniquement les domaines nécessaires
+  const allowedOrigins = [
+    'https://devis-couvreur1.vercel.app',
+    'https://roof-widget.vercel.app',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Origin');
+  
+  // Requête preflight OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { license } = req.query;
   
-  // Récupérer le domaine depuis l'Origin header (SÉCURISÉ)
-  const origin = req.headers.origin || req.headers.referer || '';
-  let domain = origin.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const requestOrigin = req.headers.origin || req.headers.referer || '';
+  let domain = requestOrigin.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 
   if (!license) {
     return res.status(400).json({ error: 'License key required' });
   }
 
-  // Si aucun domaine trouvé, bloquer
   if (!domain) {
     return res.status(400).json({ error: 'Unable to determine domain' });
   }
@@ -35,37 +54,36 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'License is inactive' });
     }
     
-    // Vérification stricte du domaine
-    const allowedDomains = licenseData.domain.split(',').map(d => d.trim());
+    const allowedDomains = licenseData.allowedOrigins || [licenseData.domain];
     const isDomainAllowed = allowedDomains.some(allowed => {
-      // Correspondance exacte
-      if (domain === allowed) return true;
-      // Sous-domaine (ex: www.monsite.fr pour monsite.fr)
-      if (domain.endsWith(`.${allowed}`)) return true;
-      // Localhost pour les tests
-      if (allowed === 'localhost' && (domain === 'localhost' || domain.startsWith('localhost:'))) return true;
-      return false;
+      const allowedClean = allowed.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      return domain === allowedClean;
     });
     
     if (!isDomainAllowed) {
-      console.log(`❌ Domaine bloqué: ${domain} | Licence: ${license} | Autorisés: ${allowedDomains.join(', ')}`);
+      console.log(`❌ Domaine bloqué: ${domain}`);
       return res.status(403).json({ 
-        error: 'Domain not authorized for this license',
+        error: 'Domain not authorized',
         yourDomain: domain,
         allowedDomains: allowedDomains
       });
     }
     
-    console.log(`✅ Domaine autorisé: ${domain} | Licence: ${license}`);
-    
-    const { branding, services, pricing, regionalMultipliers } = licenseData;
+    console.log(`✅ Domaine autorisé: ${domain}`);
     
     return res.status(200).json({
       valid: true,
-      branding,
-      services,
-      pricing,
-      regionalMultipliers,
+      branding: licenseData.branding || {
+        companyName: 'Couverture Paris Pro',
+        primaryColor: '#ff6b00'
+      },
+      services: licenseData.services || {
+        renovation: true,
+        repair: true,
+        cleaning: true,
+        insulation: true
+      },
+      pricing: licenseData.pricing,
       timestamp: Date.now()
     });
     
