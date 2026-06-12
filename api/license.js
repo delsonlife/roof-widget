@@ -6,10 +6,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { license, domain } = req.query;
+  const { license } = req.query;
+  
+  // Récupérer le domaine depuis l'Origin header (SÉCURISÉ)
+  const origin = req.headers.origin || req.headers.referer || '';
+  let domain = origin.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 
-  if (!license || !domain) {
-    return res.status(400).json({ error: 'License and domain required' });
+  if (!license) {
+    return res.status(400).json({ error: 'License key required' });
+  }
+
+  // Si aucun domaine trouvé, bloquer
+  if (!domain) {
+    return res.status(400).json({ error: 'Unable to determine domain' });
   }
 
   try {
@@ -26,12 +35,28 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'License is inactive' });
     }
     
-    const domainPattern = licenseData.domainPattern || licenseData.domain;
-    const domainRegex = new RegExp('^' + domainPattern.replace(/\*/g, '.*') + '$');
+    // Vérification stricte du domaine
+    const allowedDomains = licenseData.domain.split(',').map(d => d.trim());
+    const isDomainAllowed = allowedDomains.some(allowed => {
+      // Correspondance exacte
+      if (domain === allowed) return true;
+      // Sous-domaine (ex: www.monsite.fr pour monsite.fr)
+      if (domain.endsWith(`.${allowed}`)) return true;
+      // Localhost pour les tests
+      if (allowed === 'localhost' && (domain === 'localhost' || domain.startsWith('localhost:'))) return true;
+      return false;
+    });
     
-    if (!domainRegex.test(domain) && domain !== licenseData.domain) {
-      return res.status(403).json({ error: 'Domain not authorized for this license' });
+    if (!isDomainAllowed) {
+      console.log(`❌ Domaine bloqué: ${domain} | Licence: ${license} | Autorisés: ${allowedDomains.join(', ')}`);
+      return res.status(403).json({ 
+        error: 'Domain not authorized for this license',
+        yourDomain: domain,
+        allowedDomains: allowedDomains
+      });
     }
+    
+    console.log(`✅ Domaine autorisé: ${domain} | Licence: ${license}`);
     
     const { branding, services, pricing, regionalMultipliers } = licenseData;
     
