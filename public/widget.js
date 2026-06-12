@@ -1,7 +1,6 @@
 (function() {
-  // Récupération de la licence depuis l'URL
   const urlParams = new URLSearchParams(window.location.search);
-  const LICENSE_KEY = urlParams.get('license') || 'ABC123';
+  const LICENSE_KEY = urlParams.get('license') || 'DMP2024';
   
   const API_BASE = 'https://toiture-one.vercel.app';
   let currentStep = 0;
@@ -107,6 +106,7 @@
       showError('Licence invalide ou domaine non autorisé');
       return;
     }
+    // Afficher directement le widget sans bouton flottant
     render();
   }
 
@@ -143,7 +143,6 @@
         <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
         <h3>Accès non autorisé</h3>
         <p>${message}</p>
-        <p style="font-size: 12px; margin-top: 12px;">Licence: ${LICENSE_KEY}</p>
       </div>
     `;
   }
